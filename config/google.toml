@@ -10,8 +10,8 @@ path = "public"
 [database]
 # type = "local"
 type = "google"
-name = "esper-dev"
-user = "will"
+name = "esper-dev-movies2"
+user = "dan"
 password = "foobar"
 
 [compute]

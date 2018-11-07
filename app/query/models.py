@@ -9,30 +9,7 @@ class Identity(models.Model):
     name = base.CharField()
 
 
-class CanonicalShow(models.Model):
-    name = base.CharField()
-    is_recurring = models.BooleanField(default=False)
-    hosts = models.ManyToManyField(Identity, blank=True)
-
-
-class Show(models.Model):
-    name = base.CharField()
-    hosts = models.ManyToManyField(Identity, blank=True)
-    canonical_show = models.ForeignKey(CanonicalShow)
-
-
-class Channel(models.Model):
-    name = base.CharField()
-
-
 class Video(base.Video):
-    channel = models.ForeignKey(Channel)
-    show = models.ForeignKey(Show)
-    time = models.DateTimeField()
-    commercials_labeled = models.BooleanField(default=False)
-    srt_extension = base.CharField()
-    threeyears_dataset = models.BooleanField(default=False)
-
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
 
@@ -72,19 +49,6 @@ class Gender(models.Model):
 
 Track = base.Track(Labeler)
 
-class Commercial(Track):
-    pass
-
-
-class Topic(models.Model):
-    name = base.CharField()
-
-
-class Segment(Track):
-    topics = models.ManyToManyField(Topic)
-    polarity = models.FloatField(null=True)
-    subjectivity = models.FloatField(null=True)
-
 
 class Shot(Track):
     in_commercial = models.BooleanField(default=False)
@@ -98,7 +62,6 @@ class Face(Labeled, base.BoundingBox, models.Model):
     frame = models.ForeignKey(Frame)
     shot = models.ForeignKey(Shot, null=True)
     background = models.BooleanField(default=False)
-    is_host = models.BooleanField(default=False)
     blurriness = models.FloatField(null=True)
     probability = models.FloatField(default=1.)
 
@@ -140,24 +103,3 @@ class Object(base.BoundingBox, models.Model):
     label = models.IntegerField()
     probability = models.FloatField()
 
-class LabeledCommercial(models.Model):
-    video = models.ForeignKey(Video)
-    start = models.FloatField()
-    end = models.FloatField()
-
-class LabeledPanel(models.Model):
-    video = models.ForeignKey(Video)
-    start = models.FloatField()
-    end = models.FloatField()
-    num_panelists = models.IntegerField()
-
-class LabeledInterview(models.Model):
-    video = models.ForeignKey(Video)
-    start = models.FloatField()
-    end = models.FloatField()
-    interviewer1 = base.CharField(default=None, blank=True, null=True)
-    interviewer2 = base.CharField(default=None, blank=True, null=True)
-    guest1 = base.CharField(default=None, blank=True, null=True)
-    guest2 = base.CharField(default=None, blank=True, null=True)
-    original = models.BooleanField(default=True)
-    scattered_clips = models.BooleanField(default=False)

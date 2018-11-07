@@ -20,8 +20,8 @@ import django.db.models as models
 from esper.prelude import collect, BUCKET
 from query.base_models import Track
 from query.models import \
-    Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Segment, Tag, Object, \
-    Topic, Identity
+    Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Tag, Object, \
+    Identity
 import django.apps
 
 def access(obj: Any, path: str) -> Any:
@@ -243,8 +243,6 @@ def qs_to_result(result: QuerySet,
                 'min_frame': t.min_frame,
                 'max_frame': t.max_frame,
             }
-            if cls is Segment:
-                result['things'] = [thing.id for thing in t.things.all()]
 
             materialized_result.append(result)
         if custom_order_by_id is not None:
@@ -333,7 +331,7 @@ def esper_js_globals():
 def result_with_metadata(result):
     video_ids = set()
     frame_ids = set()
-    labeler_ids = set([Labeler.objects.get(name='handlabeled-face').id])
+    labeler_ids = set()
     gender_ids = set()
     for group in result['result']:
         for obj in group['elements']:
@@ -371,7 +369,6 @@ def result_with_metadata(result):
     frames = to_dict(Frame.objects.filter(id__in=frame_ids))
     labelers = to_dict(Labeler.objects.filter(id__in=labeler_ids))
     genders = to_dict(Gender.objects.all())
-    topics = to_dict(Topic.objects.all())
     identities = to_dict(Identity.objects.all())
 
     return {
@@ -383,7 +380,6 @@ def result_with_metadata(result):
         },
         'categories': {
             'genders': genders,
-            'topics': topics,
             'identities': identities
         }
     }

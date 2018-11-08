@@ -5,7 +5,7 @@ zone = "us-east1-d"
 [storage]
 type = "google"
 bucket = "esper"
-path = "public"
+path = "public/movies"
 
 [database]
 # type = "local"

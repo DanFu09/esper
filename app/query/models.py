@@ -10,6 +10,9 @@ class Identity(models.Model):
 
 
 class Video(base.Video):
+    name = base.CharField()
+    year = models.IntegerField()
+
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
 

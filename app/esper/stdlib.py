@@ -258,7 +258,10 @@ def qs_to_result(result: QuerySet,
             result = result.order_by('id')
 
         for v in result[:limit]:
-            materialized_result.append({'video': v.id, 'min_frame': 0})
+            materialized_result.append({
+                'video': v.id,
+                'min_frame': 0,
+                'max_frame': v.num_frames})
 
     else:
         raise Exception("Unsupported class")

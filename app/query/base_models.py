@@ -195,7 +195,7 @@ class Pose(models.Model):
 
     def _format_keypoints(self):
         kp = np.frombuffer(self.keypoints, dtype=np.float32)
-        return kp.reshape((kp.shape[0] / 3, 3))
+        return kp.reshape((int(kp.shape[0] / 3), 3))
 
     POSE_KEYPOINTS = 18
     FACE_KEYPOINTS = 70

@@ -21,7 +21,7 @@ from esper.prelude import collect, BUCKET
 from query.base_models import Track
 from query.models import \
     Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Tag, Object, \
-    Identity
+    Identity, Pose
 import django.apps
 
 def access(obj: Any, path: str) -> Any:
@@ -151,7 +151,7 @@ def qs_to_result(result: QuerySet,
                 'objects': []
             })
 
-    elif cls is Face or cls is FaceGender or cls is FaceIdentity or cls is Object:
+    elif cls is Face or cls is FaceGender or cls is FaceIdentity or cls is Object or cls is Pose:
         if cls is FaceGender or cls is FaceIdentity:
             frame_path = 'face__frame'
             if cls is FaceGender:

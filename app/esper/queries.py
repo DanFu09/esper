@@ -46,6 +46,13 @@ def all_videos():
     return qs_to_result(Video.objects.all())
 
 
+@query("All poses")
+def all_poses():
+    from query.models import Pose
+    from esper.stdlib import qs_to_result
+    return qs_to_result(Pose.objects.all(), stride=1000)
+
+
 #@query("Frames with a man left of a woman")
 def man_left_of_woman():
     frames = []
@@ -1003,7 +1010,7 @@ def identity_across_shows():
     return group_results(results)
 
 
-@query('Host with other still face')
+#@query('Host with other still face')
 def shots_with_host_and_still_face():
     from query.models import FaceIdentity
     from esper.stdlib import qs_to_result
@@ -1081,7 +1088,7 @@ def shots_with_host_and_still_face():
         limit=100000
     )
 
-@query('Hand-labeled Interviews (Sandbox)')
+#@query('Hand-labeled Interviews (Sandbox)')
 def handlabeled_interviews():
     from query.models import LabeledInterview
     from esper.rekall import qs_to_intrvllists, intrvllists_to_result
@@ -1093,7 +1100,7 @@ def handlabeled_interviews():
 
     return intrvllists_to_result(qs_to_intrvllists(interviews))
 
-@query('Hand-labeled Panels (Sandbox)')
+#@query('Hand-labeled Panels (Sandbox)')
 def handlabeled_panels():
     from query.models import LabeledPanel
     from esper.rekall import qs_to_intrvllists, intrvllists_to_result
@@ -1105,7 +1112,7 @@ def handlabeled_panels():
 
     return intrvllists_to_result(qs_to_intrvllists(panels))
 
-@query('Hand-labeled Commercials (Sandbox)')
+#@query('Hand-labeled Commercials (Sandbox)')
 def handlabeled_commercials():
     from query.models import LabeledCommercial
     from esper.rekall import qs_to_intrvllists, intrvllists_to_result
@@ -1117,7 +1124,7 @@ def handlabeled_commercials():
 
     return intrvllists_to_result(qs_to_intrvllists(commercials))
 
-@query('Multiple Timelines (Sandbox)')
+#@query('Multiple Timelines (Sandbox)')
 def multiple_timelines():
     from query.models import LabeledInterview, LabeledPanel, LabeledCommercial
     from esper.rekall import qs_to_intrvllists, intrvllists_to_result, add_intrvllists_to_result

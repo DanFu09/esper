@@ -124,8 +124,6 @@ def not_handlabeled():
     return qs_to_result(
         FaceGender.objects.filter(labeler=l, id__gte=i).exclude(
             Q(face__frame__tags=t)
-            | Q(face__shot__in_commercial=True)
-            | Q(face__shot__video__commercials_labeled=False)
             | Q(face__shot__isnull=True)),
         stride=1000)
 
@@ -167,7 +165,7 @@ def two_identities():
         limit=100000
     )
 
-@query("Commercials")
+#@query("Commercials")
 def commercials():
     from query.models import Commercial
     from esper.stdlib import qs_to_result
@@ -530,7 +528,7 @@ def obama_pictures():
 
 @query("Frames with two women")
 def frames_with_two_women():
-    face_qs = FaceGender.objects.filter(gender__name='F', face__shot__in_commercial=False)
+    face_qs = FaceGender.objects.filter(gender__name='F')
     frames = list(Frame.objects.annotate(c=qs_child_count(face_qs, 'face__frame')) \
         .filter(c=2)[:1000:10])
 
@@ -544,7 +542,7 @@ def panels():
 
     mtcnn = Labeler.objects.get(name='mtcnn')
     face_qs = Face.objects.annotate(height=BoundingBox.height_expr()).filter(
-        height__gte=0.25, labeler=mtcnn, shot__in_commercial=False)
+        height__gte=0.25, labeler=mtcnn)
     frames = Frame.objects.annotate(c=Subquery(
         face_qs.filter(frame=OuterRef('pk')) \
         .values('frame') \
@@ -666,7 +664,7 @@ def random_without_topics():
     }
 
 
-@query("Non-handlabeled random audio")
+#@query("Non-handlabeled random audio")
 def nonhandlabeled_random_audio():
     from query.models import Video, Speaker, Commercial
     from esper.stdlib import qs_to_result
@@ -935,14 +933,14 @@ def face_search_with_exclusion():
 
     if show_excluded:
         # Show the furthest faces that we kept and the faces that were excluded
-        kept_results = qs_to_result(face_qs.filter(id__in=kept_ids, shot__in_commercial=False),
+        kept_results = qs_to_result(face_qs.filter(id__in=kept_ids),
                                     custom_order_by_id=face_ids[::-1])
-        excluded_results = qs_to_result(face_qs.filter(id__in=excluded_ids, shot__in_commercial=False))
+        excluded_results = qs_to_result(face_qs.filter(id__in=excluded_ids))
 
         return group_results([('excluded', excluded_results), (name, kept_results)])
     else:
         # Show all of the faces that were kept
-        return qs_to_result(face_qs.filter(id__in=kept_ids, shot__in_commercial=False),
+        return qs_to_result(face_qs.filter(id__in=kept_ids),
                             custom_order_by_id=face_ids,limit=len(face_ids))
 
 

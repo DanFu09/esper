@@ -38,6 +38,9 @@ class VideoTag(models.Model):
 class Frame(base.Frame):
     tags = models.ManyToManyField(Tag)
     shot_boundary = models.BooleanField(default=False)
+    brightness = models.FloatField(null=True)
+    contrast = models.FloatField(null=True)
+    sharpness = models.FloatField(null=True)
 
 
 class Labeler(base.Labeler):

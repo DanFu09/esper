@@ -18,7 +18,7 @@ frames = [
 ]
 
 # Calculate contrast
-contrast = st.contrast.compute_contrast(
+contrast = st.imgproc.compute_contrast(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames

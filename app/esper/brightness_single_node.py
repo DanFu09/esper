@@ -18,7 +18,7 @@ frames = [
 ]
 
 # Calculate brightness
-brightness = st.brightness.compute_brightness(
+brightness = st.imgproc.compute_brightness(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames

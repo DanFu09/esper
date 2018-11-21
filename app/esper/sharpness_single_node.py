@@ -18,7 +18,7 @@ frames = [
 ]
 
 # Calculate sharpness
-sharpness = st.sharpness.compute_sharpness(
+sharpness = st.imgproc.compute_sharpness(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames

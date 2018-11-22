@@ -108,3 +108,5 @@ class Object(base.BoundingBox, models.Model):
     label = models.IntegerField()
     probability = models.FloatField()
 
+class FaceLandmarks(Labeled, base.FaceLandmarks, models.Model):
+    face = models.ForeignKey(Face)

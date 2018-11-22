@@ -237,3 +237,12 @@ class Pose(models.Model):
     class Meta:
         abstract = True
 
+class FaceLandmarks(models.Model):
+    landmarks = models.BinaryField()
+
+    def _format_landmarks(self):
+        landmarks = np.frombuffer(self.landmarks, dtype=np.float32)
+        return landmarks.reshape(68, 2)
+
+    class Meta:
+        abstract = True

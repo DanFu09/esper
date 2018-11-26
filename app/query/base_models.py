@@ -241,8 +241,50 @@ class FaceLandmarks(models.Model):
     landmarks = models.BinaryField()
 
     def _format_landmarks(self):
-        landmarks = np.frombuffer(self.landmarks, dtype=np.float32)
+        landmarks = np.frombuffer(self.landmarks, dtype=np.float64)
         return landmarks.reshape(68, 2)
+
+    # Slice values for each set of landmarks
+    FACE_OUTLINE = (0, 17)
+    RIGHT_EYEBROW = (17, 22)
+    LEFT_EYEBROW = (22, 27)
+    NOSE_BRIDGE = (27, 31)
+    NOSE_BOTTOM = (31, 36)
+    RIGHT_EYE = (36, 42)
+    LEFT_EYE = (42, 48)
+    OUTER_LIPS = (48, 60)
+    INNER_LIPS = (60, 68)
+
+    def _get_landmarks(self, slice_values):
+        landmarks = self._format_landmarks()
+        return landmarks[slice_values[0]:slice_values[1]]
+
+    def face_outline(self):
+        return self._get_landmarks(self.FACE_OUTLINE)
+
+    def right_eyebrow(self):
+        return self._get_landmarks(self.RIGHT_EYEBROW)
+
+    def left_eyebrow(self):
+        return self._get_landmarks(self.LEFT_EYEBROW)
+
+    def nose_bridge(self):
+        return self._get_landmarks(self.NOSE_BRIDGE)
+
+    def nose_bottom(self):
+        return self._get_landmarks(self.NOSE_BOTTOM)
+
+    def right_eye(self):
+        return self._get_landmarks(self.RIGHT_EYE)
+
+    def left_eye(self):
+        return self._get_landmarks(self.LEFT_EYE)
+
+    def outer_lips(self):
+        return self._get_landmarks(self.OUTER_LIPS)
+
+    def inner_lips(self):
+        return self._get_landmarks(self.INNER_LIPS)
 
     class Meta:
         abstract = True

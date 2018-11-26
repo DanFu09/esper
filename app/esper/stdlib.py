@@ -21,7 +21,7 @@ from esper.prelude import collect, BUCKET
 from query.base_models import Track
 from query.models import \
     Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Tag, Object, \
-    Identity, Pose
+    Identity, Pose, FaceLandmarks
 import django.apps
 
 def access(obj: Any, path: str) -> Any:
@@ -89,6 +89,25 @@ def pose_to_dict(f: Any) -> Dict:
     }
 
 
+def face_landmarks_to_dict(f: Any) -> Dict:
+    return {
+        'id': f.id,
+        'labeler': f.labeler.id,
+        'type': 'face_landmarks',
+        'landmarks': {
+            'face_outline': f.face_outline().tolist(),
+            'right_eyebrow': f.right_eyebrow().tolist(),
+            'left_eyebrow': f.left_eyebrow().tolist(),
+            'nose_bridge': f.nose_bridge().tolist(),
+            'nose_bottom': f.nose_bottom().tolist(),
+            'right_eye': f.right_eye().tolist(),
+            'left_eye': f.left_eye().tolist(),
+            'outer_lips': f.outer_lips().tolist(),
+            'inner_lips': f.inner_lips().tolist()
+        }
+    }
+
+    
 def simple_result(result: Dict, ty: str) -> Dict:
     return {
         'result': [{
@@ -151,13 +170,16 @@ def qs_to_result(result: QuerySet,
                 'objects': []
             })
 
-    elif cls is Face or cls is FaceGender or cls is FaceIdentity or cls is Object or cls is Pose:
-        if cls is FaceGender or cls is FaceIdentity:
+    elif (cls is Face or cls is FaceGender or cls is FaceIdentity
+            or cls is Object or cls is Pose or cls is FaceLandmarks):
+        if cls is FaceGender or cls is FaceIdentity or cls is FaceLandmarks:
             frame_path = 'face__frame'
             if cls is FaceGender:
                 result = result.select_related('face', 'gender')
-            else:
+            elif cls is FaceIdentity:
                 result = result.select_related('face', 'identity')
+            else:
+                result = result.select_related('face')
         else:
             frame_path = 'frame'
         result = result.select_related(frame_path)
@@ -173,6 +195,8 @@ def qs_to_result(result: QuerySet,
             fn = identity_to_dict
         elif cls is Pose:
             fn = pose_to_dict
+        elif cls is FaceLandmarks:
+            fn = face_landmarks_to_dict
 
         if frame_major:
             frame_ids = set()

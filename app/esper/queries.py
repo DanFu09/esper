@@ -53,6 +53,13 @@ def all_poses():
     return qs_to_result(Pose.objects.all(), stride=1000)
 
 
+@query("All face landmarks")
+def all_face_landmarks():
+    from query.models import FaceLandmarks
+    from esper.stdlib import qs_to_result
+    return qs_to_result(FaceLandmarks.objects.all(), stride=1000)
+
+
 #@query("Frames with a man left of a woman")
 def man_left_of_woman():
     frames = []

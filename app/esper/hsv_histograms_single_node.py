@@ -2,7 +2,7 @@ import scannerpy
 import scannertools as st
 import os
 from django.db.models import Q
-from query.models import Video, VideoTag
+from query.models import Video, VideoTag, Labeler, Tag
 from esper.prelude import Notifier
 
 video_ids = [vals[0] for vals in

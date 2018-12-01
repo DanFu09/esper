@@ -6,9 +6,7 @@ from query.models import Video, Frame, Face, Labeler, Tag, VideoTag, FaceGender,
 from esper.prelude import Notifier
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(
-        Q(name__contains="star wars") | Q(name__contains="harry potter")) \
-                .filter(~Q(name="star wars episode i the phantom menace"))
+videos = Video.objects.filter(name__contains='godfather')
 db = scannerpy.Database()
 
 # Calculate at 2 fps
@@ -21,7 +19,8 @@ frames = [
 faces = st.face_detection.detect_faces(
     db,
     videos=[video.for_scannertools() for video in videos],
-    frames=frames
+    frames=frames,
+    megabatch=1
 )
 
 # Detect genders
@@ -29,7 +28,8 @@ genders = st.gender_detection.detect_genders(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames,
-    bboxes=faces
+    bboxes=faces,
+    megabatch=1
 )
 
 # Labeler for this pipeline

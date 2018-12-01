@@ -15,4 +15,4 @@ user = "dan"
 password = "foobar"
 
 [compute]
-gpu = false
+gpu = true

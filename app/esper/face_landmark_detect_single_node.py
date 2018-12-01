@@ -6,8 +6,7 @@ from query.models import Video, Frame, Face, Labeler, Tag, VideoTag, FaceLandmar
 from esper.prelude import Notifier
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(
-        Q(name__contains="star wars") | Q(name__contains="harry potter"))
+videos = Video.objects.filter(name__contains='godfather')
 db = scannerpy.Database()
 
 # Calculate at 2 fps
@@ -20,7 +19,8 @@ frames = [
 faces = st.face_detection.detect_faces(
     db,
     videos=[video.for_scannertools() for video in videos],
-    frames=frames
+    frames=frames,
+    megabatch=1
 )
 
 # Detect face landmarks
@@ -28,7 +28,8 @@ face_landmarks = st.face_landmark_detection.detect_face_landmarks(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames,
-    bboxes=faces
+    bboxes=faces,
+    megabatch=1
 )
 
 # Labeler for this pipeline
@@ -73,4 +74,4 @@ Frame.tags.through.objects.bulk_create(new_frame_tags)
 new_videotags = [VideoTag(video=video, tag=LABELED_TAG) for video in videos]
 VideoTag.objects.bulk_create(new_videotags)
 
-Notifier.notify('Done with face landmark detection')
+Notifier().notify('Done with face landmark detection')

@@ -7,7 +7,8 @@ from esper.prelude import Notifier
 import json
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(name__contains='godfather')
+videos = Video.objects.filter(
+        Q(name__contains="star wars") | Q(name__contains="harry potter"))
 db = scannerpy.Database()
 
 # Calculate at 2 fps
@@ -20,8 +21,7 @@ frames = [
 faces = st.face_detection.detect_faces(
     db,
     videos=[video.for_scannertools() for video in videos],
-    frames=frames,
-    megabatch=1
+    frames=frames
 )
 
 # Compute face embeddings
@@ -29,8 +29,7 @@ features = st.face_embedding.embed_faces(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames,
-    bboxes=faces,
-    megabatch=1
+    bboxes=faces
 )
 
 # Labeler for this pipeline

@@ -5,17 +5,17 @@ from django.db.models import Q
 from esper.prelude import Notifier
 from query.models import Video, Shot, VideoTag, Labeler, Tag
 
-videos = Video.objects.filter(name__contains='godfather')
+videos = Video.objects.filter(
+        Q(name__contains="star wars") | Q(name__contains="harry potter")) \
+                .filter(~Q(name="star wars episode i the phantom menace"))
 db = scannerpy.Database()
 
 hists = st.shot_detection.compute_histograms(db,
         videos=[video.for_scannertools() for video in videos],
-        run_opts={'work_packet_size': 100, 'io_packet_size': 10000},
-        megabatch=1)
+        run_opts={'work_packet_size': 100, 'io_packet_size': 10000})
 boundaries = st.shot_detection.compute_shot_boundaries(db,
         videos=[video.for_scannertools() for video in videos],
-        histograms=hists,
-        megabatch=1)
+        histograms=hists)
 
 LABELER, _ = Labeler.objects.get_or_create(name='shot-histogram')
 LABELED_TAG, _ = Tag.objects.get_or_create(name='shot-histogram:labeled')

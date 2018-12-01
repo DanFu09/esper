@@ -7,7 +7,7 @@ from query.models import Video, Frame, Labeler, Tag, VideoTag, Pose
 from esper.prelude import Notifier
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(name__contains='godfather')
+videos = Video.objects.filter(name="star wars episode i the phantom menace")
 db = scannerpy.Database()
 
 # Calculate at 2 fps
@@ -20,7 +20,7 @@ poses = st.pose_detection.detect_poses(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames,
-    megabatch=1
+    cache=False
 )
 
 # Labeler for this pipeline
@@ -41,13 +41,13 @@ for video, framelist, poseframelist in zip(videos, frames, poses):
 Pose.objects.bulk_create(new_poses, batch_size=100000)
 
 # Tag all the frames as being labeled
-new_frame_tags = []
-for video, framelist in zip(videos, frames):
-    frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
-    for frame in frame_objs:
-        new_frame_tags.append(
-                Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
-Frame.tags.through.objects.bulk_create(new_frame_tags)
+#new_frame_tags = []
+#for video, framelist in zip(videos, frames):
+#    frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
+#    for frame in frame_objs:
+#        new_frame_tags.append(
+#                Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
+#Frame.tags.through.objects.bulk_create(new_frame_tags)
 
 # Tag this video as being labeled
 new_videotags = [VideoTag(video=video, tag=LABELED_TAG) for video in videos]

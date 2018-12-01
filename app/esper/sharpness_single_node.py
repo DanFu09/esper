@@ -7,7 +7,8 @@ from query.models import Video, Frame, Labeler, Tag, VideoTag
 from esper.prelude import Notifier
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(name__contains='godfather')
+videos = Video.objects.filter(
+        Q(name__contains="star wars") | Q(name__contains="harry potter"))
 db = scannerpy.Database()
 
 # Calculate at 2 fps
@@ -17,11 +18,10 @@ frames = [
 ]
 
 # Calculate sharpness
-sharpness = st.imgproc.compute_sharpness_cpp(
+sharpness = st.imgproc.compute_sharpness(
     db,
     videos=[video.for_scannertools() for video in videos],
-    frames=frames,
-    megabatch=1
+    frames=frames
 )
 
 # Labeler for this pipeline

@@ -95,9 +95,9 @@ def schema(request):
 
 
 # Convert captions in SRT format to WebVTT (for displaying in web UI)
-def srt_to_vtt(s):
+def srt_to_vtt(s, subs_shift=0):
     subs = pysrt.from_string(s)
-    subs.shift(seconds=-5)  # Seems like TV news captions are delayed by a few seconds
+    subs.shift(seconds=subs_shift)
 
     entry_fmt = '{position}\n{start} --> {end}\n{text}'
 

@@ -32,226 +32,18 @@ def query(name):
 
     return wrapper
 
+from .all_faces import *
+from .all_faces_rekall import *
+from .all_videos import *
+from .all_poses import *
+from .all_face_landmarks import *
+from .shot_reverse_shot import *
+from .man_woman_up_close import *
+from .faces_from_poses import *
+from .frames_with_two_women import *
+from .three_people import *
 
-@query("All faces")
-def all_faces():
-    from query.models import Face
-    from esper.stdlib import qs_to_result
-    return qs_to_result(Face.objects.all(), stride=1000)
-
-
-@query("All faces (rekall)")
-def all_faces_rekall():
-    from query.models import Face
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from esper.stdlib import qs_to_result
-        
-    # Annotate face rows with start and end frames and the video ID
-    faces = Face.objects.annotate(
-        min_frame=F('frame__number'),
-        max_frame=F('frame__number'),
-        video_id=F('frame__video_id'))
-
-    # Materialize all the faces and load them into rekall with bounding box payloads
-    # Then coalesce them so that all faces in the same frame are in the same interval
-    # NOTE that this is slow right now since we're loading all faces!
-    vids = VideoIntervalCollection.from_django_qs(
-        faces,
-        with_payload=in_array(
-            bbox_payload_parser(VideoIntervalCollection.django_accessor))
-        ).coalesce(payload_merge_op=payload_plus)
-
-    # Post-process to display in Esper widget
-    return intrvllists_to_result_bbox(vids.get_allintervals(), limit=100, stride=100)
-
-
-@query("All videos")
-def all_videos():
-    from query.models import Video
-    from esper.stdlib import qs_to_result
-    return qs_to_result(Video.objects.all())
-
-
-@query("All poses")
-def all_poses():
-    from query.models import Pose
-    from esper.stdlib import qs_to_result
-    return qs_to_result(Pose.objects.all(), stride=1000)
-
-
-@query("Shot/Reverse Shot Conversations (rekall)")
-def shot_reverse_shot():
-    from query.models import Face
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from rekall.payload_predicates import payload_satisfies
-    from rekall.list_predicates import length_at_most
-    from rekall.logical_predicates import and_pred, or_pred
-    from rekall.spatial_predicates import scene_graph, make_region
-    from rekall.temporal_predicates import before, after
-    from rekall.bbox_predicates import height_at_least
-    from esper.rekall import intrvllists_to_result, add_intrvllists_to_result
-        
-    # Annotate face rows with start and end frames and the video ID
-    faces = Face.objects.annotate(
-        min_frame=F('frame__number'),
-        max_frame=F('frame__number'),
-        video_id=F('frame__video_id'))
-
-    right_half = make_region(0.45, 0.0, 1.0, 1.0)
-    left_half = make_region(0.0, 0.0, .55, 1.0)
-
-    graph = {
-        'nodes': [ { 'name': 'face', 'predicates': [ height_at_least(0.4) ] } ],
-        'edges': []
-    }
-
-    vids = VideoIntervalCollection.from_django_qs(
-        faces,
-        with_payload=in_array(
-            bbox_payload_parser(VideoIntervalCollection.django_accessor))
-    ).coalesce(payload_merge_op=payload_plus)
-
-    faces_on_right = vids.filter(
-        and_pred(
-            payload_satisfies(length_at_most(2)),
-            payload_satisfies(scene_graph(graph, region=right_half))
-        )
-    ).dilate(6).coalesce()
-
-    faces_on_left = vids.filter(
-        and_pred(
-            payload_satisfies(length_at_most(2)),
-            payload_satisfies(scene_graph(graph, region=left_half))
-        )
-    ).dilate(6).coalesce()
-
-    shot_reverse_shot = faces_on_right.merge(
-        faces_on_left,
-        predicate=or_pred(before(max_dist=24), after(max_dist=24), arity=2)
-    ).dilate(96).coalesce().dilate(-96).filter_length(min_length=240)
-
-    # Post-process to display in Esper widget
-    results = intrvllists_to_result(shot_reverse_shot.get_allintervals())
-    add_intrvllists_to_result(results, faces_on_left.get_allintervals(), color='black')
-    add_intrvllists_to_result(results, faces_on_right.get_allintervals(), color='green')
-    return results
-
-
-@query("Man and woman up close (rekall)")
-def man_woman_up_close():
-    from query.models import FaceGender
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser, merge_dict_parsers, dict_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from rekall.payload_predicates import payload_satisfies
-    from rekall.spatial_predicates import scene_graph
-    from rekall.bbox_predicates import height_at_least
-    
-    # Annotate face rows with start and end frames and the video ID
-    faces_with_gender= FaceGender.objects.annotate(
-        min_frame=F('face__frame__number'),
-        max_frame=F('face__frame__number'),
-        video_id=F('face__frame__video_id'),
-        bbox_x1=F('face__bbox_x1'),
-        bbox_y1=F('face__bbox_y1'),
-        bbox_x2=F('face__bbox_x2'),
-        bbox_y2=F('face__bbox_y2'),
-        gender_name=F('gender__name'),
-        face_probability=F('face__probability'))
-
-    faces = VideoIntervalCollection.from_django_qs(
-        faces_with_gender,
-        with_payload=in_array(merge_dict_parsers([
-            bbox_payload_parser(VideoIntervalCollection.django_accessor),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'gender': 'gender_name' }),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'gender_probability': 'probability' }),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'face_probability': 'face_probability' })
-        ]))
-    ).coalesce(payload_merge_op=payload_plus)
-
-    graph = {
-        'nodes': [
-            { 'name': 'face_male', 'predicates': [
-                height_at_least(0.6),
-                lambda payload: payload['gender'] is 'M',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
-                ] },
-            { 'name': 'face_female', 'predicates': [
-                height_at_least(0.6),
-                lambda payload: payload['gender'] is 'F',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
-                ] },
-        ],
-        'edges': []
-    }
-
-    mf_up_close = faces.filter(payload_satisfies(
-        scene_graph(graph, exact=True)))
-
-    return intrvllists_to_result_bbox(mf_up_close.get_allintervals(), limit=100, stride=100)
-
-@query("Faces from poses (rekall)")
-def faces_from_poses_rekall():
-    from query.models import Pose
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from esper.stdlib import qs_to_result
-        
-    # Annotate pose rows with start and end frames and the video ID
-    poses = Pose.objects.annotate(
-        min_frame=F('frame__number'),
-        max_frame=F('frame__number'),
-        video_id=F('frame__video_id'))
-
-    # Parse the pose keypoints and get a bounding box around the face
-    def get_face_bbox(pose):
-        pose_keypoints = pose.pose_keypoints()
-        face_indices = [Pose.Nose, Pose.Neck, Pose.REye,
-                        Pose.LEye, Pose.REar, Pose.LEar]
-        x_vals = [pose_keypoints[index][0] for index in face_indices
-                     if pose_keypoints[index][2] is not 0.0]
-        y_vals = [pose_keypoints[index][1] for index in face_indices
-                     if pose_keypoints[index][2] is not 0.0]
-        x1 = min(x_vals)
-        y1 = min(y_vals)
-        x2 = max(x_vals)
-        y2 = max(y_vals)
-        return {
-            'x1': x1,
-            'y1': y1,
-            'x2': x2,
-            'y2': y2
-        }
-
-    # Materialize all the faces and load them into rekall with bounding box payloads
-    # Then coalesce them so that all faces in the same frame are in the same interval
-    # NOTE that this is slow right now since we're loading all poses!
-    vids = VideoIntervalCollection.from_django_qs(poses,
-        with_payload=in_array(get_face_bbox)) \
-        .coalesce(payload_merge_op=payload_plus)
-
-    # Post-process to display in Esper widget
-    return intrvllists_to_result_bbox(vids.get_allintervals(), limit=100, stride=100)
-
-
-@query("All face landmarks")
-def all_face_landmarks():
-    from query.models import FaceLandmarks
-    from esper.stdlib import qs_to_result
-    return qs_to_result(FaceLandmarks.objects.all(), stride=1000)
-
-
+# Old queries from TV news for reference
 #@query("Frames with a man left of a woman")
 def man_left_of_woman():
     frames = []
@@ -347,7 +139,7 @@ def donald_trump():
     from esper.stdlib import qs_to_result
     return qs_to_result(FaceIdentity.objects.filter(identity__name='donald trump', probability__gt=0.99))
 
-@query('Two identities')
+#@query('Two identities')
 def two_identities():
     person1 = 'sean hannity'
     person2 = 'paul manafort'
@@ -725,106 +517,6 @@ def obama_pictures():
         'objects': [bbox_to_dict(f)]
     } for (t, f) in out_tracks], 'FaceTrack')
 
-@query("Frames with two women (rekall)")
-def frames_with_two_women():
-    from query.models import FaceGender
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser, merge_dict_parsers, dict_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from rekall.payload_predicates import payload_satisfies
-    from rekall.spatial_predicates import scene_graph
-    
-    # Annotate face rows with start and end frames and the video ID
-    faces_with_gender= FaceGender.objects.annotate(
-        min_frame=F('face__frame__number'),
-        max_frame=F('face__frame__number'),
-        video_id=F('face__frame__video_id'),
-        bbox_x1=F('face__bbox_x1'),
-        bbox_y1=F('face__bbox_y1'),
-        bbox_x2=F('face__bbox_x2'),
-        bbox_y2=F('face__bbox_y2'),
-        gender_name=F('gender__name'),
-        face_probability=F('face__probability'))
-
-    faces = VideoIntervalCollection.from_django_qs(
-        faces_with_gender,
-        with_payload=in_array(merge_dict_parsers([
-            bbox_payload_parser(VideoIntervalCollection.django_accessor),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'gender': 'gender_name' }),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'gender_probability': 'probability' }),
-            dict_payload_parser(VideoIntervalCollection.django_accessor, { 'face_probability': 'face_probability' })
-        ]))
-    ).coalesce(payload_merge_op=payload_plus)
-
-    graph = {
-        'nodes': [
-            { 'name': 'face1', 'predicates': [
-                lambda payload: payload['gender'] is 'F',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
-                ] },
-            { 'name': 'face2', 'predicates': [
-                lambda payload: payload['gender'] is 'F',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
-                ] },
-        ],
-        'edges': []
-    }
-
-    two_women = faces.filter(payload_satisfies(
-        scene_graph(graph, exact=True)))
-
-    return intrvllists_to_result_bbox(two_women.get_allintervals(), limit=100, stride=100)
-
-
-@query("Three people (rekall)")
-def three_people():
-    from query.models import Face
-    from rekall.video_interval_collection import VideoIntervalCollection
-    from rekall.parsers import in_array, bbox_payload_parser
-    from rekall.merge_ops import payload_plus
-    from esper.rekall import intrvllists_to_result_bbox
-    from rekall.payload_predicates import payload_satisfies
-    from rekall.spatial_predicates import scene_graph
-    from rekall.bbox_predicates import height_at_least, left_of, same_value
-        
-    # Annotate face rows with start and end frames and the video ID
-    faces = Face.objects.annotate(
-        min_frame=F('frame__number'),
-        max_frame=F('frame__number'),
-        video_id=F('frame__video_id'))
-
-    # Materialize all the faces and load them into rekall with bounding box payloads
-    # Then coalesce them so that all faces in the same frame are in the same interval
-    # NOTE that this is slow right now since we're loading all faces!
-    face_lists = VideoIntervalCollection.from_django_qs(
-        faces,
-        with_payload=in_array(
-            bbox_payload_parser(VideoIntervalCollection.django_accessor))
-        ).coalesce(payload_merge_op=payload_plus)
-
-    three_people_scene_graph = {
-        'nodes': [
-            { 'name': 'face1', 'predicates': [ height_at_least(0.3) ] },
-            { 'name': 'face2', 'predicates': [ height_at_least(0.3) ] },
-            { 'name': 'face3', 'predicates': [ height_at_least(0.3) ] }
-        ],
-        'edges': [
-            { 'start': 'face1', 'end': 'face2', 'predicates': [ left_of(), same_value('y1', epsilon=0.05) ] },
-            { 'start': 'face2', 'end': 'face3', 'predicates': [ left_of(), same_value('y1', epsilon=0.05) ] }
-        ]
-    }
-
-    three_people = face_lists.filter(payload_satisfies(scene_graph(
-        three_people_scene_graph, exact=True
-    )))
-
-    # Post-process to display in Esper widget
-    return intrvllists_to_result_bbox(three_people.get_allintervals(), limit=100, stride=100)
-
-
 #@query("Animated Rachel Maddow")
 def animated_rachel_maddow():
     def pose_dist(p1, p2):
@@ -953,7 +645,7 @@ def nonhandlabeled_random_audio():
         limit=None)
 
 
-@query("Caption search")
+#@query("Caption search")
 def caption_search():
     from esper.captions import topic_search
     from query.models import Video
@@ -973,7 +665,7 @@ def caption_search():
     } for k, t1, t2 in flattened[:100]], '_')
 
 
-@query('Face search')
+#@query('Face search')
 def face_search():
     from esper.embed_google_images import name_to_embedding
     from esper.face_embeddings import knn
@@ -983,7 +675,7 @@ def face_search():
         Face.objects.filter(id__in=face_ids), custom_order_by_id=face_ids, limit=len(face_ids))
 
 
-@query('Groups of faces by distance threshold')
+#@query('Groups of faces by distance threshold')
 def groups_of_faces_by_distance_threshold():
     from esper.embed_google_images import name_to_embedding
     from esper.face_embeddings import knn
@@ -1019,7 +711,7 @@ def groups_of_faces_by_distance_threshold():
     return group_results(agg_results)
 
 
-@query('Face search by id')
+#@query('Face search by id')
 def face_search_by_id():
      # Wolf Blitzer
 #     target_face_ids = [975965, 5254043, 844004, 105093, 3801699, 4440669, 265071]
@@ -1089,7 +781,7 @@ def face_search_by_id():
     return group_results(agg_results)
 
 
-@query('Face search with exclusions')
+#@query('Face search with exclusions')
 def face_search_with_exclusion():
     from esper.embed_google_images import name_to_embedding
     from esper.face_embeddings import knn
@@ -1130,7 +822,7 @@ def face_search_with_exclusion():
                             custom_order_by_id=face_ids,limit=len(face_ids))
 
 
-@query('Other people who are on screen with X')
+#@query('Other people who are on screen with X')
 def face_search_for_other_people():
     from esper.face_embeddings import kmeans
     
@@ -1334,7 +1026,7 @@ def multiple_timelines():
 
     return result
 
-@query('Interview with person X (rekall, sandbox)')
+#@query('Interview with person X (rekall, sandbox)')
 def interview_with_person_x():
     from query.models import LabeledCommercial, FaceIdentity
     from rekall.video_interval_collection import VideoIntervalCollection
@@ -1396,7 +1088,7 @@ def interview_with_person_x():
     # Return intervals
     return intrvllists_to_result(interviews.get_allintervals())
 
-@query('Panels (rekall, sandbox)')
+#@query('Panels (rekall, sandbox)')
 def panels_rekall():
     from query.models import LabeledCommercial, Face
     from rekall.video_interval_collection import VideoIntervalCollection

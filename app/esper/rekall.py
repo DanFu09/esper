@@ -1,5 +1,5 @@
 from operator import itemgetter, attrgetter
-from query.models import Video
+from query.models import Video, Gender
 from esper.prelude import collect
 
 from rekall.interval_list import Interval, IntervalList
@@ -192,17 +192,25 @@ def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
         if limit is not None and len(materialized_results) > limit:
             break
         for intrvl in intrvllist[::stride]:
+            objects = []
+            for bbox in intrvl.get_payload():
+                obj = {
+                    'id': video,
+                    'type': 'bbox',
+                    'bbox_x1': bbox['x1'],
+                    'bbox_x2': bbox['x2'],
+                    'bbox_y1': bbox['y1'],
+                    'bbox_y2': bbox['y2'],
+                }
+                if 'gender' in bbox:
+                    obj['gender_id'] = Gender.objects.get(name=bbox['gender']).id
+                if 'identity_id' in bbox:
+                    obj['identity_id'] = bbox['identity_id']
+                objects.append(obj)
             materialized_results.append({
                 'video': video,
                 'min_frame': (intrvl.get_start() + intrvl.get_end()) / 2,
-                'objects': [{
-                        'id': video,
-                        'type': 'bbox',
-                        'bbox_x1': bbox['x1'],
-                        'bbox_x2': bbox['x2'],
-                        'bbox_y1': bbox['y1'],
-                        'bbox_y2': bbox['y2'],
-                    } for bbox in intrvl.get_payload()]
+                'objects': [obj for obj in objects]
                 })
 
     if limit is None:

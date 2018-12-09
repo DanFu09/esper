@@ -181,8 +181,24 @@ def intrvllists_to_result(intrvllists, color="red", video_order=None):
 
     return {'result': groups, 'count': full_count, 'type': 'Video'}
 
-def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
-    """ Gets a result for intrvllists, assuming that the objects are bounding boxes.
+def bbox_to_result_object(bbox, video):
+    obj = {
+        'id': video,
+        'type': 'bbox',
+        'bbox_x1': bbox['x1'],
+        'bbox_x2': bbox['x2'],
+        'bbox_y1': bbox['y1'],
+        'bbox_y2': bbox['y2'],
+    }
+    if 'gender' in bbox:
+        obj['gender_id'] = Gender.objects.get(name=bbox['gender']).id
+    if 'identity_id' in bbox:
+        obj['identity_id'] = bbox['identity_id']
+    return obj
+
+def intrvllists_to_result_with_objects(intrvllists, payload_to_objs, limit=None, stride=1):
+    """ Gets a result for intrvllists.
+    `payload_to_objs` parses each (payload, video_id) into a list of objects
     """
     materialized_results = []
     for video in intrvllists:
@@ -192,25 +208,10 @@ def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
         if limit is not None and len(materialized_results) > limit:
             break
         for intrvl in intrvllist[::stride]:
-            objects = []
-            for bbox in intrvl.get_payload():
-                obj = {
-                    'id': video,
-                    'type': 'bbox',
-                    'bbox_x1': bbox['x1'],
-                    'bbox_x2': bbox['x2'],
-                    'bbox_y1': bbox['y1'],
-                    'bbox_y2': bbox['y2'],
-                }
-                if 'gender' in bbox:
-                    obj['gender_id'] = Gender.objects.get(name=bbox['gender']).id
-                if 'identity_id' in bbox:
-                    obj['identity_id'] = bbox['identity_id']
-                objects.append(obj)
             materialized_results.append({
                 'video': video,
                 'min_frame': (intrvl.get_start() + intrvl.get_end()) / 2,
-                'objects': [obj for obj in objects]
+                'objects': payload_to_objs(intrvl.get_payload(), video)
                 })
 
     if limit is None:
@@ -221,6 +222,13 @@ def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
             for r in materialized_results]
 
     return {'result': groups, 'count': len(list(intrvllists.keys())), 'type': 'Video'}
+
+def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
+    """ Gets a result for intrvllists, assuming that the objects are bounding boxes.
+    """
+    def parse_bboxes(p, video):
+        return [bbox_to_result_object(bbox, video) for bbox in p]
+    return intrvllists_to_result_with_objects(intrvllists, parse_bboxes, limit, stride)
 
 def add_intrvllists_to_result(result, intrvllists, color="red"):
     """ Add intrvllists to result as another set of segments to display. Modifies result.

@@ -210,7 +210,8 @@ def intrvllists_to_result_with_objects(intrvllists, payload_to_objs, limit=None,
         for intrvl in intrvllist[::stride]:
             materialized_results.append({
                 'video': video,
-                'min_frame': (intrvl.get_start() + intrvl.get_end()) / 2,
+                'min_frame': intrvl.get_start(),
+                'max_frame': intrvl.get_end(),
                 'objects': payload_to_objs(intrvl.get_payload(), video)
                 })
 

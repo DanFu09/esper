@@ -40,7 +40,7 @@ def hero_shot():
     # Load bounding boxes and faces into rekall, and put all faces in one frame
     faces = VideoIntervalCollection.from_django_qs(
         faces_qs,
-        with_payload=merge_dict_parsers([named_payload('face',
+        with_payload=merge_dict_parsers([named_payload('faces',
             in_array(bbox_payload_parser(VideoIntervalCollection.django_accessor))),
             dict_payload_parser(VideoIntervalCollection.django_accessor, {
                 'brightness': 'brightness',
@@ -48,7 +48,7 @@ def hero_shot():
                 'sharpness': 'sharpness'
             })])
     ).coalesce(merge_named_payload({
-        'face': payload_plus,
+        'faces': payload_plus,
         'brightness': payload_first,
         'contrast': payload_first,
         'sharpness': payload_first
@@ -58,7 +58,7 @@ def hero_shot():
     #   certain height, and brightness, contrast, and sharpness are at least
     #   some amount
     hero_shots = faces.filter(payload_satisfies(and_pred(
-        on_name('face', scene_graph({
+        on_name('faces', scene_graph({
             'nodes': [{ 'name': 'face', 'predicates': [
                 height_at_least(MIN_FACE_HEIGHT) ] }],
             'edges': []
@@ -70,5 +70,5 @@ def hero_shot():
     
     return intrvllists_to_result_with_objects(hero_shots.get_allintervals(), 
         lambda payload, video_id: [
-            bbox_to_result_object(bbox, video_id) for bbox in payload['face']],
+            bbox_to_result_object(bbox, video_id) for bbox in payload['faces']],
         limit=100, stride=10)

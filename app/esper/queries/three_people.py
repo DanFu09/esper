@@ -13,6 +13,9 @@ def three_people():
     from rekall.spatial_predicates import scene_graph
     from rekall.bbox_predicates import height_at_least, left_of, same_value
         
+    MIN_FACE_HEIGHT = 0.3
+    EPSILON = 0.05
+
     # Annotate face rows with start and end frames and the video ID
     faces = Face.objects.annotate(
         min_frame=F('frame__number'),
@@ -30,13 +33,13 @@ def three_people():
 
     three_people_scene_graph = {
         'nodes': [
-            { 'name': 'face1', 'predicates': [ height_at_least(0.3) ] },
-            { 'name': 'face2', 'predicates': [ height_at_least(0.3) ] },
-            { 'name': 'face3', 'predicates': [ height_at_least(0.3) ] }
+            { 'name': 'face1', 'predicates': [ height_at_least(MIN_FACE_HEIGHT) ] },
+            { 'name': 'face2', 'predicates': [ height_at_least(MIN_FACE_HEIGHT) ] },
+            { 'name': 'face3', 'predicates': [ height_at_least(MIN_FACE_HEIGHT) ] }
         ],
         'edges': [
-            { 'start': 'face1', 'end': 'face2', 'predicates': [ left_of(), same_value('y1', epsilon=0.05) ] },
-            { 'start': 'face2', 'end': 'face3', 'predicates': [ left_of(), same_value('y1', epsilon=0.05) ] }
+            { 'start': 'face1', 'end': 'face2', 'predicates': [ left_of(), same_value('y1', epsilon=EPSILON) ] },
+            { 'start': 'face2', 'end': 'face3', 'predicates': [ left_of(), same_value('y1', epsilon=EPSILON) ] }
         ]
     }
 

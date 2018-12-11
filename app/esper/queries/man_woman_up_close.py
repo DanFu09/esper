@@ -13,6 +13,10 @@ def man_woman_up_close():
     from rekall.spatial_predicates import scene_graph
     from rekall.bbox_predicates import height_at_least
     
+    MIN_FACE_CONFIDENCE = 0.95
+    MIN_GENDER_CONFIDENCE = 0.95
+    MIN_FACE_HEIGHT = 0.6
+
     # Annotate face rows with start and end frames and the video ID
     faces_with_gender= FaceGender.objects.annotate(
         min_frame=F('face__frame__number'),
@@ -38,16 +42,16 @@ def man_woman_up_close():
     graph = {
         'nodes': [
             { 'name': 'face_male', 'predicates': [
-                height_at_least(0.6),
+                height_at_least(MIN_FACE_HEIGHT),
                 lambda payload: payload['gender'] is 'M',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
+                lambda payload: payload['face_probability'] > MIN_FACE_CONFIDENCE,
+                lambda payload: payload['gender_probability'] > MIN_GENDER_CONFIDENCE
                 ] },
             { 'name': 'face_female', 'predicates': [
-                height_at_least(0.6),
+                height_at_least(MIN_FACE_HEIGHT),
                 lambda payload: payload['gender'] is 'F',
-                lambda payload: payload['face_probability'] > 0.95,
-                lambda payload: payload['gender_probability'] > 0.95
+                lambda payload: payload['face_probability'] > MIN_FACE_CONFIDENCE,
+                lambda payload: payload['gender_probability'] > MIN_GENDER_CONFIDENCE
                 ] },
         ],
         'edges': []

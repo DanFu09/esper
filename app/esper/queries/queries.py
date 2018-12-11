@@ -38,6 +38,7 @@ from .all_videos import *
 from .all_poses import *
 from .all_face_landmarks import *
 from .shot_reverse_shot import *
+from .shot_reverse_shot_flat import *
 from .shot_reverse_shot_with_context import *
 from .man_woman_up_close import *
 from .faces_from_poses import *

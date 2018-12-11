@@ -35,12 +35,17 @@ class VideoTag(models.Model):
     tag = models.ForeignKey(Tag)
 
 
+class ShotScale(models.Model):
+    name = base.CharField()
+
+
 class Frame(base.Frame):
     tags = models.ManyToManyField(Tag)
     shot_boundary = models.BooleanField(default=False)
     brightness = models.FloatField(null=True)
     contrast = models.FloatField(null=True)
     sharpness = models.FloatField(null=True)
+    shot_scale = models.ForeignKey(ShotScale, null=True)
 
 
 class Labeler(base.Labeler):

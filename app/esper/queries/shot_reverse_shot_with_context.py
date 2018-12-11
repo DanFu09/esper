@@ -53,7 +53,7 @@ def shot_reverse_shot_with_context():
         predicate=or_pred(before(max_dist=24), after(max_dist=24), arity=2)
     ).dilate(96).coalesce().dilate(-96).filter_length(min_length=180)
     
-    poses = Pose.objects.annotate(
+    poses = Pose.objects.filter(frame__shot_scale__name__in=["M","ML","L","XL"]).annotate(
         min_frame=F('frame__number'),
         max_frame=F('frame__number'),
         video_id=F('frame__video_id'))

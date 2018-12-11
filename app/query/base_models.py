@@ -154,7 +154,7 @@ class Features(models.Model):
     distto = models.FloatField(null=True)
 
     def load_features(self):
-        return np.array(json.loads(self.features.decode()))
+        return np.array(json.loads(self.features.tobytes().decode()))
 
     @classmethod
     def compute_distances(cls, inst_id):

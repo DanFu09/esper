@@ -45,7 +45,7 @@ class Frame(base.Frame):
     brightness = models.FloatField(null=True)
     contrast = models.FloatField(null=True)
     sharpness = models.FloatField(null=True)
-    shot_scale = models.ForeignKey(ShotScale, null=True)
+    shot_scale = models.ForeignKey(ShotScale, default=1)
 
 
 class Labeler(base.Labeler):

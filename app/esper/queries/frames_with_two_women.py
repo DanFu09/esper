@@ -14,6 +14,7 @@ def frames_with_two_women():
     
     MIN_FACE_CONFIDENCE = 0.95
     MIN_GENDER_CONFIDENCE = 0.95
+    VIDEO_NAME_CONTAINS = "harry potter"
 
     # Annotate face rows with start and end frames and the video ID
     faces_with_gender= FaceGender.objects.annotate(
@@ -25,7 +26,8 @@ def frames_with_two_women():
         bbox_x2=F('face__bbox_x2'),
         bbox_y2=F('face__bbox_y2'),
         gender_name=F('gender__name'),
-        face_probability=F('face__probability'))
+        face_probability=F('face__probability')
+    ).filter(face__frame__video__name__contains=VIDEO_NAME_CONTAINS)
 
     faces = VideoIntervalCollection.from_django_qs(
         faces_with_gender,
@@ -54,6 +56,6 @@ def frames_with_two_women():
     }
 
     two_women = faces.filter(payload_satisfies(
-        scene_graph(graph, exact=True)))
+        scene_graph(graph, exact=False)))
 
-    return intrvllists_to_result_bbox(two_women.get_allintervals(), limit=100, stride=100)
+    return intrvllists_to_result_bbox(two_women.get_allintervals(), limit=100, stride=10)

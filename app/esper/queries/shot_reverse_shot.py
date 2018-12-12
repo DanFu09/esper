@@ -15,8 +15,11 @@ def shot_reverse_shot():
     from rekall.spatial_predicates import scene_graph, make_region
     from rekall.temporal_predicates import before, after
     from rekall.bbox_predicates import height_at_least
-    from esper.rekall import intrvllists_to_result, add_intrvllists_to_result
+    from esper.rekall import intrvllists_to_result, intrvllists_to_result_with_objects, add_intrvllists_to_result
         
+    # If True, visualize results in a timeline
+    TIMELINE_OUTPUT = False
+
     RIGHT_HALF_MIN_X = 0.45
     LEFT_HALF_MAX_X = 0.55
     MIN_FACE_HEIGHT = 0.4
@@ -75,7 +78,11 @@ def shot_reverse_shot():
     ).dilate(FOUR_SECONDS).coalesce().dilate(-1 * FOUR_SECONDS).filter_length(min_length=TEN_SECONDS)
 
     # Post-process to display in Esper widget
-    results = intrvllists_to_result(shot_reverse_shot.get_allintervals())
-    add_intrvllists_to_result(results, faces_on_left.get_allintervals(), color='black')
-    add_intrvllists_to_result(results, faces_on_right.get_allintervals(), color='green')
+    if TIMELINE_OUTPUT:
+        results = intrvllists_to_result(shot_reverse_shot.get_allintervals())
+        add_intrvllists_to_result(results, faces_on_left.get_allintervals(), color='black')
+        add_intrvllists_to_result(results, faces_on_right.get_allintervals(), color='green')
+    else:
+        results = intrvllists_to_result_with_objects(
+            shot_reverse_shot.get_allintervals(), lambda payload, video: [])
     return results

@@ -13,7 +13,10 @@ def shot_reverse_shot_with_context():
     from rekall.spatial_predicates import scene_graph, make_region
     from rekall.temporal_predicates import before, after, overlaps_before
     from rekall.video_interval_collection import VideoIntervalCollection
-    from esper.rekall import intrvllists_to_result, add_intrvllists_to_result
+    from esper.rekall import intrvllists_to_result, add_intrvllists_to_result, intrvllists_to_result_with_objects
+
+    # If True, visualize results in a timeline
+    TIMELINE_OUTPUT = False
 
     RIGHT_HALF_MIN_X = 0.45
     LEFT_HALF_MAX_X = 0.55
@@ -93,7 +96,13 @@ def shot_reverse_shot_with_context():
         shot_reverse_shot, 
         predicate=or_pred(before(max_dist=24), overlaps_before(),arity=2)
     ).dilate(96).coalesce().dilate(-96).filter_length(min_length=240)
+
     # Post-process to display in Esper widget
-    results = intrvllists_to_result(shot_countershot_start_wide.get_allintervals())
-    add_intrvllists_to_result(results, shot_reverse_shot.get_allintervals(), color='black')
+    if TIMELINE_OUTPUT:
+        results = intrvllists_to_result(shot_countershot_start_wide.get_allintervals())
+        add_intrvllists_to_result(results, shot_reverse_shot.get_allintervals(), color='black')
+    else:
+        results = intrvllists_to_result_with_objects(
+            shot_countershot_start_wide.get_allintervals(),
+            lambda payload, video: [])
     return results

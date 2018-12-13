@@ -138,21 +138,45 @@ def payload_to_shot_scale(p):
             s = max(s, pose_keypoints_to_shot_scale(all_pose['pose']))
     return s
 
-def get_all_frames_with_shot_scale(video_id, scale):
+def label_videos_with_shot_scale(video_ids):
     faces = Face.objects.annotate(
             min_frame=F('frame__number'),
             max_frame=F('frame__number'),
-            video_id=F('frame__video__id')).filter(video_id=video_id)
+            video_id=F('frame__video__id')).filter(video_id__in=video_ids)
     poses = Pose.objects.annotate(
             min_frame=F('frame__number'),
             max_frame=F('frame__number'),
-            video_id=F('frame__video__id')).filter(video_id=video_id)
+            video_id=F('frame__video__id')).filter(video_id__in=video_ids)
     face_frames = VideoIntervalCollection.from_django_qs(faces,
-            with_payload=rk.parsers.merge_dict_parsers([with_face(), with_named_empty_list('pose')]))
+            with_payload=rk.parsers.merge_dict_parsers([
+                with_face(),
+                with_named_empty_list('pose'),
+                rk.parsers.dict_payload_parser(
+                    VideoIntervalCollection.django_accessor,
+                    { 'frame_id': 'frame_id' })
+                ]))
     pose_frames = VideoIntervalCollection.from_django_qs(poses,
-            with_payload=rk.parsers.merge_dict_parsers([with_pose(), with_named_empty_list('face')]))
-    collection = face_frames.set_union(pose_frames).coalesce(
+            with_payload=rk.parsers.merge_dict_parsers([
+                with_pose(),
+                with_named_empty_list('face'),
+                rk.parsers.dict_payload_parser(
+                    VideoIntervalCollection.django_accessor,
+                    { 'frame_id': 'frame_id' })
+                ]))
+    faces_with_pose = face_frames.set_union(pose_frames).coalesce(
             merge_named_payload({'pose': rk.merge_ops.payload_plus,
-                                 'face': rk.merge_ops.payload_plus}))
-    return collection.filter(rk.payload_predicates.payload_satisfies(
-        lambda p: payload_to_shot_scale(p)==scale))
+                                 'face': rk.merge_ops.payload_plus,
+                                 'frame_id': rk.merge_ops.payload_first}))
+    frames_with_shot_scale = faces_with_pose.map(
+        lambda intrvl: (intrvl.start, intrvl.end, {
+            'pose': intrvl.payload['pose'],
+            'face': intrvl.payload['face'],
+            'frame_id': intrvl.payload['frame_id'],
+            'shot_scale': payload_to_shot_scale(intrvl.payload)
+        }))
+    return frames_with_shot_scale
+
+def get_all_frames_with_shot_scale(video_id, scale):
+    return label_videos_with_shot_scale([video_id]).filter(
+            rk.payload_predicates.payload_satisfies(
+                lambda p: p['shot_scale']==scale))

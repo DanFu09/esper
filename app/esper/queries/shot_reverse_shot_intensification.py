@@ -65,12 +65,12 @@ def shot_reverse_shot_intensification():
             return True
         cur_scale = scales[0]
         for scale in scales:
-            if cur_scale == 0:
+            if cur_scale == 1:
                 cur_scale = scale
                 continue
-            if scale == 0:
+            if scale == 1:
                 continue
-            if scale > cur_scale:
+            if scale < cur_scale:
                 # Shot scale has gotten father here
                 return False
         return True
@@ -126,7 +126,7 @@ def shot_reverse_shot_intensification():
     ).filter_length(min_length=TEN_SECONDS)
 
     def non_uniform(shot_scales):
-        return (len(set(shot_scales)) > 2 if 0 in set(shot_scales) else
+        return (len(set(shot_scales)) > 2 if 1 in set(shot_scales) else
             len(set(shot_scales)) > 1)
 
     # Finally, filter out any shot sequences where the shot scales are uniform

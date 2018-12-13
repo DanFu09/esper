@@ -40,6 +40,7 @@ from .all_face_landmarks import *
 from .hero_shot import *
 from .shot_reverse_shot import *
 from .shot_reverse_shot_with_context import *
+from .shot_reverse_shot_intensification import *
 from .man_woman_up_close import *
 from .frames_with_two_women import *
 from .faces_from_poses import *

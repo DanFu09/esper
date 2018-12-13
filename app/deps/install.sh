@@ -53,3 +53,4 @@ if [ $NO_TEST != 1 ]; then
 	pytest -v .
 fi
 
+echo "SUCCESS! All dependencies installed"

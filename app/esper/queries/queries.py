@@ -39,6 +39,7 @@ from .all_poses import *
 from .all_face_landmarks import *
 from .hero_shot import *
 from .shot_reverse_shot import *
+from .shot_reverse_shot_advanced import *
 from .shot_reverse_shot_with_context import *
 from .shot_reverse_shot_intensification import *
 from .man_woman_up_close import *

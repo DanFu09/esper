@@ -11,10 +11,14 @@ class Identity(models.Model):
 class Genre(models.Model):
     name = base.CharField()
 
+class Director(models.Model):
+    name = base.CharField()
+
 class Video(base.Video):
     name = base.CharField()
     year = models.IntegerField()
-    genres = models.ManyToManyField(Genre)
+    genres = models.ManyToManyField(Genre)    
+    directors = models.ManyToManyField(Director)
 
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)

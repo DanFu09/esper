@@ -115,3 +115,6 @@ class Object(base.BoundingBox, models.Model):
 
 class FaceLandmarks(Labeled, base.FaceLandmarks, models.Model):
     face = models.ForeignKey(Face)
+
+class Genre(models.Model):
+    name = base.CharField()

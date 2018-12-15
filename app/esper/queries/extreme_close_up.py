@@ -21,5 +21,6 @@ def extreme_close_up_frames():
 
     video_id=123
     return intrvllists_to_result_with_objects(
-        get_all_frames_with_shot_scale(video_id, ShotScale.XCU).get_allintervals(),
+        get_all_frames_with_shot_scale(
+            video_id, ShotScale.EXTREME_CLOSE_UP).get_allintervals(),
         payload_to_objects, limit=1000, stride=1)

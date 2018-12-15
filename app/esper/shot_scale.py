@@ -9,32 +9,34 @@ from rekall.video_interval_collection import VideoIntervalCollection
 from query.models import *
 import numpy as np
 
-# Using https://filmanalysis.coursepress.yale.edu/cinematography/ as reference.
 from enum import IntEnum
 class ShotScale(IntEnum):
-    """ L=Long CU=Close-up X=Extreme M=Medium """
-    UNK = 0
-    XL = 1
-    L = 2
-    ML = 3
-    M = 4
-    CU = 5
-    XCU = 6
+    """ Definitions used in James Cutting's analysis """
+    UNKNOWN = 0
+    EXTREME_LONG = 1
+    LONG = 2
+    MEDIUM_LONG = 3
+    MEDIUM = 4
+    MEDIUM_CLOSE_UP = 5
+    CLOSE_UP = 6
+    EXTREME_CLOSE_UP = 7
 
 # Limitations:
 # Extreme Close-up is difficult to get since face detector does not work on those frames.
 # Long shots and Extreme Long shots are difficult to get since faces are too small for face detectors.
 def face_height_to_shot_scale(face_height):
     if face_height >= 0.95:
-        return ShotScale.XCU
+        return ShotScale.EXTREME_CLOSE_UP
+    if face_height >= 0.8:
+        return ShotScale.CLOSE_UP
     if face_height >= 0.5:
-        return ShotScale.CU
+        return ShotScale.MEDIUM_CLOSE_UP
     if face_height >= 0.25:
-        return ShotScale.M
+        return ShotScale.MEDIUM
     if face_height >= 0.12:
-        return ShotScale.ML
+        return ShotScale.MEDIUM_LONG
     # Faces are usually not detected anymore in L and XL shots.
-    return ShotScale.UNK
+    return ShotScale.UNKNOWN
 
 # Heuristics to guess scale from pose keypoints.
 def pose_keypoints_to_shot_scale(keypoints):
@@ -67,34 +69,38 @@ def pose_keypoints_to_shot_scale(keypoints):
     height = get_height(pose, all_pts, all_pts)
     if show_head and show_shoulder and show_hip and show_knee and show_ankle:
         if height >= 0.5:
-            return ShotScale.L
-        return ShotScale.XL
+            return ShotScale.LONG
+        return ShotScale.EXTREME_LONG
     if show_head and show_shoulder and show_hip and show_knee:
         if height >= 0.75:
-            return ShotScale.ML
+            return ShotScale.MEDIUM_LONG
         elif height >= 0.4:
-            return ShotScale.L
-        return ShotScale.XL
+            return ShotScale.LONG
+        return ShotScale.EXTREME_LONG
     if show_head and show_shoulder and show_hip:
         if height >= 0.75:
-            return ShotScale.M
+            return ShotScale.MEDIUM
         elif height >= 0.5:
-            return ShotScale.ML
+            return ShotScale.MEDIUM_LONG
         elif height >= 0.2:
-            return ShotScale.L
-        return ShotScale.XL
+            return ShotScale.LONG
+        return ShotScale.EXTREME_LONG
     if show_head and show_shoulder:
+        if height >= 0.8:
+            return ShotScale.CLOSE_UP
         if height >= 0.4:
-            return ShotScale.CU
+            return ShotScale.MEDIUM_CLOSE_UP
         elif height >= 0.15:
-            return ShotScale.M
-        return ShotScale.UNK
+            return ShotScale.MEDIUM
+        return ShotScale.UNKNOWN
     if show_head:
         if height >= 0.25:
-            return ShotScale.XCU
+            return ShotScale.EXTREME_CLOSE_UP
+        elif height >= 0.2:
+            return ShotScale.CLOSE_UP
         elif height >= 0.1:
-            return ShotScale.CU
-    return ShotScale.UNK    
+            return ShotScale.MEDIUM_CLOSE_UP
+    return ShotScale.UNKNOWN    
 
 def pose_payload_parser():
     def get_pose(row):
@@ -129,7 +135,7 @@ def merge_named_payload(name_to_merge_op):
     return merge
 
 def payload_to_shot_scale(p):
-    s = ShotScale.UNK
+    s = ShotScale.UNKNOWN
     if 'face' in p:
         for bbox in p['face']:
             s = max(s, face_height_to_shot_scale(bbox['y2']-bbox['y1']))

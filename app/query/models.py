@@ -8,10 +8,13 @@ import subprocess as sp
 class Identity(models.Model):
     name = base.CharField()
 
+class Genre(models.Model):
+    name = base.CharField()
 
 class Video(base.Video):
     name = base.CharField()
     year = models.IntegerField()
+    genres = models.ManyToManyField(Genre)
 
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
@@ -116,5 +119,3 @@ class Object(base.BoundingBox, models.Model):
 class FaceLandmarks(Labeled, base.FaceLandmarks, models.Model):
     face = models.ForeignKey(Face)
 
-class Genre(models.Model):
-    name = base.CharField()

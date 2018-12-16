@@ -1,5 +1,4 @@
 from esper.prelude import *
-from esper.rekall import *
 from collections import defaultdict
 from functools import reduce
 import inspect

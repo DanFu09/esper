@@ -27,7 +27,7 @@ wordcloud
 redis
 msgpack
 face-alignment
-pyro-ppl
+pyro-ppl==0.2.1
 IMDbPY
 
 #vega==0.5.0

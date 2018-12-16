@@ -110,10 +110,11 @@ class ScannerWrapper:
                 table='{} {}'.format(table, ' '.join(joins(Video)))
             ))
 
-    def sql_source_args(self, video, num_elements=None):
+    def sql_source_args(self, video, num_elements=None, filter=None):
         from query.models import Video
         return {
-            'filter': '{}.id = {}'.format(Video._meta.db_table, video.id),
+            'filter': '{}.id = {} {}'.format(
+                Video._meta.db_table, video.id, ('AND ' + filter) if filter is not None else ''),
             'num_elements': num_elements if num_elements is not None else 0
         }
 
@@ -144,16 +145,18 @@ class ScannerWrapper:
 
 
 class ScannerSQLTable(st.DataSource):
-    def __init__(self, cls, video, num_elements=None):
+    def __init__(self, cls, video, num_elements=None, filter=None):
         self._cls = cls
         self._video = video
         self._num_elements = num_elements
+        self._filter = filter
 
     def scanner_source(self, db):
         return ScannerWrapper(db).sql_source(self._cls)
 
     def scanner_args(self, db):
-        return ScannerWrapper(db).sql_source_args(self._video, num_elements=self._num_elements)
+        return ScannerWrapper(db).sql_source_args(
+            self._video, num_elements=self._num_elements, filter=self._filter)
 
 
 class ScannerSQLPipeline:

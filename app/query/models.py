@@ -6,28 +6,28 @@ import tempfile
 import subprocess as sp
 
 class Identity(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Genre(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Director(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Actor(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Producer(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Writer(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Cinematographer(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Editor(models.Model):
-    name = base.CharField()
+    name = base.CharField(unique=True)
 
 class Video(base.Video):
     name = base.CharField()

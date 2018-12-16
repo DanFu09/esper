@@ -8,11 +8,41 @@ import subprocess as sp
 class Identity(models.Model):
     name = base.CharField()
 
+class Genre(models.Model):
+    name = base.CharField()
+
+class Director(models.Model):
+    name = base.CharField()
+
+class Actor(models.Model):
+    name = base.CharField()
+
+class Producer(models.Model):
+    name = base.CharField()
+
+class Writer(models.Model):
+    name = base.CharField()
+
+class Cinematographer(models.Model):
+    name = base.CharField()
+
+class Editor(models.Model):
+    name = base.CharField()
 
 class Video(base.Video):
     name = base.CharField()
     year = models.IntegerField()
+    title = base.CharField()
 
+    genres = models.ManyToManyField(Genre)    
+    directors = models.ManyToManyField(Director)
+    producers = models.ManyToManyField(Producer)
+    writers = models.ManyToManyField(Writer)
+    cinematographers = models.ManyToManyField(Cinematographer)
+    editors = models.ManyToManyField(Editor)
+
+    box_office = models.IntegerField(null=True)
+    
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
 
@@ -115,3 +145,4 @@ class Object(base.BoundingBox, models.Model):
 
 class FaceLandmarks(Labeled, base.FaceLandmarks, models.Model):
     face = models.ForeignKey(Face)
+

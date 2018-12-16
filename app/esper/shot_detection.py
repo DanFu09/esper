@@ -19,7 +19,6 @@ from rekall.bbox_predicates import *
 from rekall.spatial_predicates import *
 from rekall.merge_ops import *
 from tqdm import tqdm
-import esper.microshot_boundaries as msb
 
 # Parameters for histogram outlier detection
 WINDOW_SIZE = 500

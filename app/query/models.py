@@ -29,11 +29,18 @@ class Cinematographer(models.Model):
 class Editor(models.Model):
     name = base.CharField(unique=True)
 
+class Country(models.Model):
+    name = base.CharField(unique=True)
+
+class Language(models.Model):
+    name = base.CharField(unique=True)
+
 class Video(base.Video):
     name = base.CharField()
     year = models.IntegerField()
     title = base.CharField()
-
+    release_month = base.CharField(null=True)
+    release_day = models.IntegerField(null=True)
     genres = models.ManyToManyField(Genre)    
     directors = models.ManyToManyField(Director)
     producers = models.ManyToManyField(Producer)
@@ -42,7 +49,15 @@ class Video(base.Video):
     editors = models.ManyToManyField(Editor)
 
     box_office = models.IntegerField(null=True)
+    budget = models.IntegerField(null=True)
+    budget_currency = base.CharField(null=True)
     
+    countries = models.ManyToManyField(Country)    
+    languages = models.ManyToManyField(Language)
+
+    rating = models.FloatField(null=True)
+    ratingCount = models.FloatField(null=True)
+
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
 

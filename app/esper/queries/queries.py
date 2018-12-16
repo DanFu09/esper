@@ -37,6 +37,7 @@ from .all_faces_rekall import *
 from .all_videos import *
 from .all_poses import *
 from .all_face_landmarks import *
+from .cinematic_shots import *
 from .hero_shot import *
 from .shot_reverse_shot import *
 from .shot_reverse_shot_with_context import *

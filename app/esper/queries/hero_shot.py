@@ -35,7 +35,12 @@ def hero_shot():
         brightness=F('frame__brightness'),
         contrast=F('frame__contrast'),
         sharpness=F('frame__sharpness')
-    ).filter(frame__video__name=FILM_NAME)
+    ).filter(
+        frame__video__name=FILM_NAME,
+        brightness__isnull=False,
+        contrast__isnull=False,
+        sharpness__isnull=False
+    )
 
     # Load bounding boxes and faces into rekall, and put all faces in one frame
     faces = VideoIntervalCollection.from_django_qs(

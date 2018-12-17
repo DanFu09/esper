@@ -13,12 +13,19 @@ from enum import IntEnum
 class ShotScale(IntEnum):
     """ Definitions used in James Cutting's analysis """
     UNKNOWN = 0
+    # Entire figure fills a small portion of the screen height.
     EXTREME_LONG = 1
+    # Entire figure fills most of the screen height.
     LONG = 2
+    # Person visible from head to knee.
     MEDIUM_LONG = 3
+    # Person visible from head to waist.
     MEDIUM = 4
+    # Person visible from head to chest.
     MEDIUM_CLOSE_UP = 5
+    # Person's head fills most of the screen height.
     CLOSE_UP = 6
+    # All or part of person's head fills the screen height.
     EXTREME_CLOSE_UP = 7
 
 # Limitations:
@@ -36,9 +43,12 @@ def face_height_to_shot_scale(face_height):
     if face_height >= 0.12:
         return ShotScale.MEDIUM_LONG
     # Faces are usually not detected anymore in L and XL shots.
+    # Even if they are detected, it is no longer reliable to use the percentage heuristic.
     return ShotScale.UNKNOWN
 
 # Heuristics to guess scale from pose keypoints.
+# It breaks down in to several cases where the frame cuts off the person at different places.
+# For each of those cases, guess a scale from the visible pose height.
 def pose_keypoints_to_shot_scale(keypoints):
     # If any of the key points in `positions` are detected
     def visible(pose, positions):
@@ -50,7 +60,7 @@ def pose_keypoints_to_shot_scale(keypoints):
         heights = rows[rows[:,2]>0, 1] # only consider existing keypoints
         return reduce(heights)
     # Get the maximum y-value difference between detected keypoints in
-    # `upper_pos` and `lower_pos`
+    # `upper_pos` and  those in `lower_pos`
     def get_height(pose, upper_pos, lower_pos):
         return get_y(pose, lower_pos, max) - get_y(pose, upper_pos, min)
 
@@ -67,16 +77,21 @@ def pose_keypoints_to_shot_scale(keypoints):
     show_shoulder = visible(pose, shoulders)
     show_head = visible(pose, head)
     height = get_height(pose, all_pts, all_pts)
+    # If entire figure is visible
     if show_head and show_shoulder and show_hip and show_knee and show_ankle:
         if height >= 0.5:
             return ShotScale.LONG
         return ShotScale.EXTREME_LONG
+    # If figure is visible from head to knee.
+    # It can be long or extreme long because the ankles may be blocked by
+    # something on screen instead of being cut off by the frame.
     if show_head and show_shoulder and show_hip and show_knee:
         if height >= 0.75:
             return ShotScale.MEDIUM_LONG
         elif height >= 0.4:
             return ShotScale.LONG
         return ShotScale.EXTREME_LONG
+    # If figure is visible from head to hip.
     if show_head and show_shoulder and show_hip:
         if height >= 0.75:
             return ShotScale.MEDIUM
@@ -85,6 +100,7 @@ def pose_keypoints_to_shot_scale(keypoints):
         elif height >= 0.2:
             return ShotScale.LONG
         return ShotScale.EXTREME_LONG
+    # If figure is visible from head to shoulder.
     if show_head and show_shoulder:
         if height >= 0.8:
             return ShotScale.CLOSE_UP
@@ -93,6 +109,9 @@ def pose_keypoints_to_shot_scale(keypoints):
         elif height >= 0.15:
             return ShotScale.MEDIUM
         return ShotScale.UNKNOWN
+    # If figure only shows head, then `height` is the y-difference among
+    # nose, ear and eye keypoints which is only a fraction of face height.
+    # Therefore the thresholds here are low.
     if show_head:
         if height >= 0.25:
             return ShotScale.EXTREME_CLOSE_UP
@@ -112,20 +131,25 @@ def pose_payload_parser():
         }
     return get_pose
 
+# Wrapper for parsing Face for VideoIntervalCollection
 def with_face():
     return rk.parsers.named_payload('face',
              rk.parsers.in_array(
                rk.parsers.bbox_payload_parser(VideoIntervalCollection.django_accessor)))
 
+# Wrapper for parsing Pose for VideoIntervalCollection
 def with_pose():
     return rk.parsers.named_payload('pose',
             rk.parsers.in_array(
                pose_payload_parser()))
 
+# Create a dict payload with key `name` and [] as value
 def with_named_empty_list(name):
     return rk.parsers.named_payload(name,
             lambda obj: [])
 
+# For a dict payload, each key has its own merge_op for
+# merging the values.
 def merge_named_payload(name_to_merge_op):
     def merge(p1,p2):
         p = {}
@@ -134,6 +158,10 @@ def merge_named_payload(name_to_merge_op):
         return p
     return merge
 
+# We estimate shot scale for the frame using the following algorithm:
+# For each face detected, estimate shot scale from that face.
+# For each pose detected, estimate shot scale from that pose.
+# Take the most closed-in shot scale from all the faces and poses.
 def payload_to_shot_scale(p):
     s = ShotScale.UNKNOWN
     if 'face' in p:
@@ -144,6 +172,9 @@ def payload_to_shot_scale(p):
             s = max(s, pose_keypoints_to_shot_scale(all_pose['pose']))
     return s
 
+# For each video in `video_ids`, compute shot_scale for all frames with
+# faces or poses. Returned intervals have payload `pose`, `face`, `frame_id`
+# and `shot_scale`.
 def label_videos_with_shot_scale(video_ids):
     faces = Face.objects.annotate(
             min_frame=F('frame__number'),
@@ -182,6 +213,7 @@ def label_videos_with_shot_scale(video_ids):
         }))
     return frames_with_shot_scale
 
+# For the given video_id, find all frames with the given scale.
 def get_all_frames_with_shot_scale(video_id, scale):
     return label_videos_with_shot_scale([video_id]).filter(
             rk.payload_predicates.payload_satisfies(

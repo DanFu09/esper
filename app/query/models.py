@@ -58,6 +58,9 @@ class Video(base.Video):
     rating = models.FloatField(null=True)
     ratingCount = models.FloatField(null=True)
 
+    small_dataset = models.BooleanField(default=False)
+    decode_errors = models.BooleanField(default=False)
+
     def get_stride(self):
         return int(math.ceil(self.fps) / 2)
 

@@ -17,6 +17,9 @@ class Director(models.Model):
 class Actor(models.Model):
     name = base.CharField(unique=True)
 
+class Character(models.Model):
+    name = base.CharField(unique=True)
+
 class Producer(models.Model):
     name = base.CharField(unique=True)
 
@@ -73,6 +76,11 @@ class Video(base.Video):
         url = sp.check_output(fetch_cmd, shell=True).decode('utf-8').split('\n')[1].split('\t')[-1]
         return url
 
+class CharacterActor(models.Model):
+    video = models.ForeignKey(Video)
+    character = models.ForeignKey(Character)
+    actor = models.ForeignKey(Actor)
+    primary = models.BooleanField(default=False)
 
 class Tag(models.Model):
     name = base.CharField()

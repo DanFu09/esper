@@ -153,6 +153,15 @@ class FaceIdentity(Labeled, models.Model):
         unique_together = ('labeler', 'face')
 
 
+class FaceCharacterActor(Labeled, models.Model):
+    face = models.ForeignKey(Face)
+    characteractor = models.ForeignKey(CharacterActor)
+    probability = models.FloatField(default=1.)
+
+    class Meta:
+        unique_together = ('labeler', 'face')
+
+
 class FaceFeatures(Labeled, base.Features, models.Model):
     face = models.ForeignKey(Face)
 

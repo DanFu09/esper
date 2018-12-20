@@ -47,10 +47,10 @@ videos = Video.objects.filter(id__in=video_ids).order_by('id').all()
 # Cluster parameters
 cfg = cluster_config(num_workers=80, worker=worker_config('n1-standard-32'),
     pipelines=[st.face_embedding.FaceEmbeddingPipeline])
-with make_cluster(cfg, no_delete=True) as db_wrapper:
-    db = db_wrapper.db
-#if True:
-#    db = scannerpy.Database() 
+#with make_cluster(cfg, no_delete=True) as db_wrapper:
+#    db = db_wrapper.db
+if True:
+    db = scannerpy.Database() 
     
     print("Loading histograms from Scanner")
 
@@ -104,8 +104,7 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
         db,
         videos=[video.for_scannertools() for video in videos],
         frames=frames,
-        bboxes=faces,
-        cache=False
+        bboxes=faces
     )
 
     print("Putting face embeddings in database")
@@ -115,8 +114,8 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
         for f in Frame.objects.filter(tags=LABELED_TAG).all()
     ])
 
-    new_features = []
     for video, framelist, facelist, featurelist in tqdm(zip(videos, frames, faces, features), total=len(videos)):
+        new_features = []
         for frame, faces_in_frame, features_in_frame in zip(framelist, facelist.load(), featurelist.load()):
             if (video.id, frame) in frames_in_db_already:
                 continue
@@ -140,18 +139,20 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
                     features=json.dumps(feature_vec.tolist()).encode(),
                     labeler=LABELER
                 ))
-    FaceFeatures.objects.bulk_create(new_features)
+        FaceFeatures.objects.bulk_create(new_features, batch_size=10000)
+    
 
-    # Tag all the frames as being labeled
-    new_frame_tags = []
-    for video, framelist in zip(videos, frames):
+    for video, framelist in tqdm(zip(videos, frames), total=len(videos)):
+        new_frame_tags = []
         frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
         for frame in frame_objs:
             if (video.id, frame.number) in frames_in_db_already:
                 continue
             new_frame_tags.append(
                     Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
-    Frame.tags.through.objects.bulk_create(new_frame_tags)
+        if len(new_frame_tags) == 0:
+            continue
+        Frame.tags.through.objects.bulk_create(new_frame_tags, batch_size=10000)
 
     # Get the videos that already have the tag
     videos_tagged_already = set([
@@ -166,5 +167,7 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
         if video.id not in videos_tagged_already
     ]
     VideoTag.objects.bulk_create(new_videotags)
+
+    print("Finished putting everything in the database")
 
 Notifier().notify('Done with face embeddings')

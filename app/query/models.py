@@ -123,6 +123,8 @@ class Shot(Track):
 class Pose(Labeled, base.Pose, models.Model):
     frame = models.ForeignKey(Frame)
 
+class PoseMeta(Labeled, models.Model):
+    frame = models.ForeignKey(Frame)
 
 class Face(Labeled, base.BoundingBox, models.Model):
     frame = models.ForeignKey(Frame)

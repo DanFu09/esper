@@ -8,6 +8,7 @@ import esper.rekall
 from rekall.video_interval_collection import VideoIntervalCollection
 from query.models import *
 import numpy as np
+import esper.pose_wrapper as pw
 
 from enum import IntEnum
 class ShotScale(IntEnum):
@@ -122,7 +123,8 @@ def pose_keypoints_to_shot_scale(keypoints):
     return ShotScale.UNKNOWN    
 
 def pose_payload_parser():
-    def get_pose(row):
+    def get_pose(pose_meta):
+        row = pw.get([pose_meta])[0]
         return {
             'hand_left': row.hand_keypoints()[0].tolist(),
             'hand_right': row.hand_keypoints()[1].tolist(),
@@ -180,7 +182,7 @@ def label_videos_with_shot_scale(video_ids):
             min_frame=F('frame__number'),
             max_frame=F('frame__number'),
             video_id=F('frame__video__id')).filter(video_id__in=video_ids)
-    poses = Pose.objects.annotate(
+    poses = PoseMeta.objects.annotate(
             min_frame=F('frame__number'),
             max_frame=F('frame__number'),
             video_id=F('frame__video__id')).filter(video_id__in=video_ids)

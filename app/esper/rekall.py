@@ -3,6 +3,7 @@ from query.models import Video, Gender
 from esper.prelude import collect
 
 from rekall.interval_list import Interval, IntervalList
+from rekall.video_interval_collection import VideoIntervalCollection
 
 def iterable_to_intrvllists(iterable, accessor, groupby="video_id", schema=None):
     """
@@ -142,11 +143,14 @@ def caption_scan_to_intrvllists(scan_result, search_terms, video_ids=None,
 def intrvllists_to_result(intrvllists, color="red", video_order=None):
     """
     Gets a result for the esper widget from a dict that maps video IDs to temporal
-    rangelists. Assumes that the Temporal Ranges store start and end in terms of
+    rangelists. Assumes that the Intervals store start and end in terms of
     frames.
 
     video_order is an optional list of video IDs to order the videos.
     """
+    if type(intrvllists) is VideoIntervalCollection:
+        intrvllists = intrvllists.get_allintervals()
+
     materialized_results = {}
     keys = []
     full_count = 0
@@ -200,6 +204,9 @@ def intrvllists_to_result_with_objects(intrvllists, payload_to_objs, limit=None,
     """ Gets a result for intrvllists.
     `payload_to_objs` parses each (payload, video_id) into a list of objects
     """
+    if type(intrvllists) is VideoIntervalCollection:
+        intrvllists = intrvllists.get_allintervals()
+
     materialized_results = []
     for video in intrvllists:
         intrvllist = intrvllists[video].get_intervals()
@@ -234,6 +241,9 @@ def intrvllists_to_result_bbox(intrvllists, limit=None, stride=1):
 def add_intrvllists_to_result(result, intrvllists, color="red"):
     """ Add intrvllists to result as another set of segments to display. Modifies result.
     """
+    if type(intrvllists) is VideoIntervalCollection:
+        intrvllists = intrvllists.get_allintervals()
+
     # Get a base group to copy for new videos
     base_group = result['result'][0]
 

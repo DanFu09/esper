@@ -2,7 +2,7 @@ from esper.prelude import *
 from esper.rekall import *
 from .queries import query
 
-@query("All poses")
+@query("All poses (rekall)")
 def all_poses():
     from query.models import PoseMeta
     from esper.stdlib import pose_to_dict, simple_result

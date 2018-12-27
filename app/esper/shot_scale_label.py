@@ -9,11 +9,12 @@ for scale in ShotScaleEnum:
 print(shot_scale_enum_to_row)
 
 video_ids = [videotag.video_id
-    for videotag in VideoTag.objects.filter(tag_id=2).all()]
+    for videotag in VideoTag.objects.filter(tag_id=2).order_by('video_id').all()]
+
 print(video_ids)
-frames_with_shot_scales = label_videos_with_shot_scale(video_ids)
+
 for video_id in tqdm(video_ids):
-    frames = frames_with_shot_scales.get_intervallist(video_id)
+    frames = label_videos_with_shot_scale([video_id]).get_intervallist(video_id)
     for frame in frames.get_intervals():
         frame_id = frame.payload['frame_id']
         shot_scale = shot_scale_enum_to_row[frame.payload['shot_scale']]

@@ -77,7 +77,10 @@ def pose_keypoints_to_shot_scale(keypoints):
     show_hip = visible(pose, hips)
     show_shoulder = visible(pose, shoulders)
     show_head = visible(pose, head)
-    height = get_height(pose, all_pts, all_pts)
+    try:
+        height = get_height(pose, all_pts, all_pts)
+    except:
+        return ShotScale.UNKNOWN
     # If entire figure is visible
     if show_head and show_shoulder and show_hip and show_knee and show_ankle:
         if height >= 0.5:

@@ -101,6 +101,7 @@ class Frame(base.Frame):
     brightness = models.FloatField(null=True)
     contrast = models.FloatField(null=True)
     sharpness = models.FloatField(null=True)
+    saturation = models.FloatField(null=True)
     shot_scale = models.ForeignKey(ShotScale, default=1)
 
 

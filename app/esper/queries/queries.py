@@ -49,3 +49,4 @@ from .frames_with_two_women import *
 from .faces_from_poses import *
 from .three_people import *
 from .extreme_close_up import *
+from .kissing import *

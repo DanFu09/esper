@@ -92,7 +92,7 @@ services:
       - seccomp=unconfined
 
   redis:
-    image: redis:4
+    image: redis:4.0.11
     ports: ['6379:6379']
     environment: []
 """.format(

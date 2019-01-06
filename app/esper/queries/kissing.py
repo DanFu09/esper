@@ -4,33 +4,54 @@ from .queries import query
 
 @query("Kissing (rekall)")
 def two_faces_up_close():
-    # Takes 2min to run!
+    # Takes 4min30s to run!
     from query.models import Face
     from rekall.video_interval_collection import VideoIntervalCollection
     from rekall.parsers import in_array, bbox_payload_parser, merge_dict_parsers, dict_payload_parser
     from rekall.merge_ops import payload_plus
     from rekall.payload_predicates import payload_satisfies
     from rekall.spatial_predicates import scene_graph
+    from rekall.face_landmark_predicates import looking_left, looking_right
     from rekall.bbox_predicates import height_at_least, same_height
-    from esper.rekall import intrvllists_to_result_bbox
+    import esper.face_landmarks_wrapper as flw
+    from esper.rekall import intrvllists_to_result_with_objects, bbox_to_result_object
+    from esper.stdlib import face_landmarks_to_dict
     
     MIN_FACE_CONFIDENCE = 0.8
     MIN_FACE_HEIGHT = 0.5
     MAX_FACE_HEIGHT_DIFF = 0.1
     MIN_FACE_OVERLAP_X = 0.05
     MIN_FACE_OVERLAP_Y = 0.2
+    
+    def map_payload(func):
+        def map_fn(intvl):
+            intvl.payload = func(intvl.payload)
+            return intvl
+        return map_fn
+    
+    def get_landmarks(faces):
+        ids = [face['id'] for face in faces]
+        try:
+            landmarks = flw.get(Face.objects.filter(id__in=ids))
+        except:
+            print("Error getting landmarks:", ids)
+            return []
+        for face, landmark in zip(faces, landmarks):
+            face['landmarks'] = landmark
+        return faces
 
     # Annotate face rows with start and end frames and the video ID
-    faces = Face.objects.filter(probability__gte=MIN_FACE_CONFIDENCE).annotate(
+    faces_qs = Face.objects.filter(probability__gte=MIN_FACE_CONFIDENCE).annotate(
         min_frame=F('frame__number'),
         max_frame=F('frame__number'),
         height = F('bbox_y2')-F('bbox_y1'),
         video_id=F('frame__video_id')).filter(height__gte=MIN_FACE_HEIGHT)
 
     faces = VideoIntervalCollection.from_django_qs(
-        faces,
+        faces_qs,
         with_payload=in_array(merge_dict_parsers([
-            bbox_payload_parser(VideoIntervalCollection.django_accessor)
+            bbox_payload_parser(VideoIntervalCollection.django_accessor),
+            dict_payload_parser(VideoIntervalCollection.django_accessor, {'id': 'id'})
         ]))
     ).coalesce(payload_merge_op=payload_plus)
 
@@ -49,7 +70,19 @@ def two_faces_up_close():
             ]},
         ]
     }
+    
+    graph2 = {
+        'nodes': [
+            {'name': 'left', 'predicates': [looking_right]},
+            {'name': 'right', 'predicates': [looking_left]},
+        ],
+        'edges': []
+    }
 
-    faces_up_close = faces.filter(payload_satisfies(
-        scene_graph(graph, exact=True)))
-    return intrvllists_to_result_bbox(faces_up_close)
+    mf_up_close = faces.filter(payload_satisfies(
+        scene_graph(graph, exact=True))).map(map_payload(get_landmarks)).filter(
+        payload_satisfies(scene_graph(graph2, exact=True)))
+    
+    return intrvllists_to_result_with_objects(mf_up_close,
+                lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p] + [
+                   bbox_to_result_object(face, video_id) for face in p])

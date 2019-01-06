@@ -17,6 +17,7 @@ def two_faces_up_close():
     from esper.rekall import intrvllists_to_result_with_objects, bbox_to_result_object
     from esper.stdlib import face_landmarks_to_dict
     
+    MAX_MOUTH_DIFF = 0.15
     MIN_FACE_CONFIDENCE = 0.8
     MIN_FACE_HEIGHT = 0.5
     MAX_FACE_HEIGHT_DIFF = 0.1
@@ -71,12 +72,24 @@ def two_faces_up_close():
         ]
     }
     
+
+    def mouths_are_close(lm1, lm2):
+        mouth1 = np.concatenate((lm1.outer_lips(), lm1.inner_lips()))
+        mouth2 = np.concatenate((lm2.outer_lips(), lm2.inner_lips()))
+        mean1 = np.mean(mouth1, axis=0)
+        mean2 = np.mean(mouth2, axis=0)
+        return np.linalg.norm(mean1-mean2) <= MAX_MOUTH_DIFF
+        
     graph2 = {
         'nodes': [
             {'name': 'left', 'predicates': [looking_right]},
             {'name': 'right', 'predicates': [looking_left]},
         ],
-        'edges': []
+        'edges': [
+            {'start': 'left', 'end':'right', 'predicates':[
+                lambda l, r: mouths_are_close(l['landmarks'], r['landmarks'])
+            ]}
+        ]
     }
 
     mf_up_close = faces.filter(payload_satisfies(

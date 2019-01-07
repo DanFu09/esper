@@ -33,3 +33,4 @@ video-analysis
 **/*.mp4
 **/*.pkl
 **/*_pb2.py
+**/*.sav

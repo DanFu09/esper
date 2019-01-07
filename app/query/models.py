@@ -117,6 +117,9 @@ class Gender(models.Model):
 
 Track = base.Track(Labeler)
 
+class ActorGender(models.Model):
+    actor = models.ForeignKey(Actor, unique=True)
+    gender = models.ForeignKey(Gender)
 
 class Shot(Track):
     pass

@@ -33,6 +33,7 @@ def query(name):
 
 from .all_faces import *
 from .all_faces_rekall import *
+from .faces_with_gender import *
 from .all_videos import *
 from .all_poses import *
 from .all_face_landmarks import *

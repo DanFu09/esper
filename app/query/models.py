@@ -179,9 +179,13 @@ class ScannerJob(models.Model):
     name = base.CharField()
 
 
+class ObjectLabel(models.Model):
+    name = base.CharField(unique=True)
+
+
 class Object(base.BoundingBox, models.Model):
     frame = models.ForeignKey(Frame)
-    label = models.IntegerField()
+    label = models.ForeignKey(ObjectLabel)
     probability = models.FloatField()
 
 class FaceLandmarks(Labeled, base.FaceLandmarks, models.Model):

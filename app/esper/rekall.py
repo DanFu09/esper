@@ -1,5 +1,5 @@
 from operator import itemgetter, attrgetter
-from query.models import Video, Gender
+from query.models import Video, Gender, Actor, Character
 from esper.prelude import collect
 
 from rekall.interval_list import Interval, IntervalList
@@ -196,8 +196,10 @@ def bbox_to_result_object(bbox, video):
     }
     if 'gender' in bbox:
         obj['gender_id'] = Gender.objects.get(name=bbox['gender']).id
-    if 'identity_id' in bbox:
-        obj['identity_id'] = bbox['identity_id']
+    if 'actor' in bbox:
+        obj['actor_id'] = Actor.objects.get(name=bbox['actor']).id
+    if 'character' in bbox:
+        obj['character_id'] = Character.objects.get(name=bbox['character']).id
     return obj
 
 def intrvllists_to_result_with_objects(intrvllists, payload_to_objs, limit=None, stride=1):

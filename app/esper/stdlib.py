@@ -21,7 +21,7 @@ from esper.prelude import collect, BUCKET
 from query.base_models import Track
 from query.models import \
     Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Tag, Object, \
-    Identity, Pose, FaceLandmarks
+    Identity, Pose, FaceLandmarks, Character, Actor
 import django.apps
 
 def access(obj: Any, path: str) -> Any:
@@ -360,6 +360,8 @@ def result_with_metadata(result):
     frame_ids = set()
     labeler_ids = set()
     gender_ids = set()
+    actor_ids = set()
+    character_ids = set()
     for group in result['result']:
         for obj in group['elements']:
             video_ids.add(obj['video'])
@@ -389,6 +391,12 @@ def result_with_metadata(result):
                         if 'gender_id' in bbox:
                             gender_ids.add(bbox['gender_id'])
 
+                        if 'actor_id' in bbox:
+                            actor_ids.add(bbox['actor_id'])
+
+                        if 'character_ids' in bbox:
+                            character_ids.add(bbox['character_id'])
+
     def to_dict(qs):
         return {t['id']: t for t in list(qs.values())}
 
@@ -397,6 +405,8 @@ def result_with_metadata(result):
     labelers = to_dict(Labeler.objects.filter(id__in=labeler_ids))
     genders = to_dict(Gender.objects.all())
     identities = to_dict(Identity.objects.all())
+    actors = to_dict(Actor.objects.all())
+    characters = to_dict(Character.objects.all())
 
     return {
         'groups': result['result'],
@@ -407,6 +417,8 @@ def result_with_metadata(result):
         },
         'categories': {
             'genders': genders,
-            'identities': identities
+            'identities': identities,
+            'actors': actors,
+            'characters': characters
         }
     }

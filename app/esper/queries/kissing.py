@@ -5,12 +5,13 @@ from .queries import query
 @query("Kissing (rekall)")
 def two_faces_up_close():
     # Takes 4min30s to run!
-    from query.models import Face
+    from query.models import Face, Shot
     from rekall.video_interval_collection import VideoIntervalCollection
     from rekall.parsers import in_array, bbox_payload_parser, merge_dict_parsers, dict_payload_parser
     from rekall.merge_ops import payload_plus
     from rekall.payload_predicates import payload_satisfies
     from rekall.spatial_predicates import scene_graph
+    from rekall.temporal_predicates import overlaps
     from rekall.face_landmark_predicates import looking_left, looking_right
     from rekall.bbox_predicates import height_at_least, same_height
     import esper.face_landmarks_wrapper as flw
@@ -23,6 +24,7 @@ def two_faces_up_close():
     MAX_FACE_HEIGHT_DIFF = 0.1
     MIN_FACE_OVERLAP_X = 0.05
     MIN_FACE_OVERLAP_Y = 0.2
+    MAX_FACE_OVERLAP_X_FRACTION = 0.7
     
     def map_payload(func):
         def map_fn(intvl):
@@ -68,14 +70,18 @@ def two_faces_up_close():
                 lambda f1, f2: min(f1['y2'], f2['y2'])-max(f1['y1'], f1['y1']) > MIN_FACE_OVERLAP_Y,
                 lambda f1, f2: f1['y2'] > f2['y1'] and f1['y1'] < f2['y2'],  # No face is entirely above another
                 same_height(MAX_FACE_HEIGHT_DIFF),
+                lambda f1, f2: (f1['x2']-f2['x1'])/max(f1['x2']-f1['x1'], f2['x2']-f2['x1']) < MAX_FACE_OVERLAP_X_FRACTION
+
             ]},
         ]
     }
     
 
     def mouths_are_close(lm1, lm2):
-        mouth1 = np.concatenate((lm1.outer_lips(), lm1.inner_lips()))
-        mouth2 = np.concatenate((lm2.outer_lips(), lm2.inner_lips()))
+        select_outer=[2,3,4,8,9,10]
+        select_inner=[1,2,3,5,6,7]
+        mouth1 = np.concatenate((lm1.outer_lips()[select_outer], lm1.inner_lips()[select_inner]))
+        mouth2 = np.concatenate((lm2.outer_lips()[select_outer], lm2.inner_lips()[select_inner]))
         mean1 = np.mean(mouth1, axis=0)
         mean2 = np.mean(mouth2, axis=0)
         return np.linalg.norm(mean1-mean2) <= MAX_MOUTH_DIFF
@@ -95,7 +101,29 @@ def two_faces_up_close():
     mf_up_close = faces.filter(payload_satisfies(
         scene_graph(graph, exact=True))).map(map_payload(get_landmarks)).filter(
         payload_satisfies(scene_graph(graph2, exact=True)))
+
+    vids = mf_up_close.get_allintervals().keys()
+    # Merge with shots
+    shots_qs = Shot.objects.filter(
+        video_id__in = vids,
+        labeler=Labeler.objects.get(name='shot-hsvhist-face')
+    ).all()
+    total = shots_qs.count()
+    print("Total shots:", total)
+    # use emtpy list as payload
+    shots = VideoIntervalCollection.from_django_qs(
+        shots_qs,
+        with_payload=lambda row:[],
+        progress=True,
+        total=total
+    )
+    kissing_shots = mf_up_close.join(
+      shots,
+      lambda kiss, shot: [(kiss.get_start(), shot.get_end(), kiss.get_payload())],
+      predicate=overlaps(),
+      working_window=1
+    ).coalesce().filter_length(min_length=12)
     
-    return intrvllists_to_result_with_objects(mf_up_close,
+    return intrvllists_to_result_with_objects(kissing_shots,
                 lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p] + [
                    bbox_to_result_object(face, video_id) for face in p])

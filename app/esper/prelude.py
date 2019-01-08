@@ -566,7 +566,7 @@ def concat_videos(paths, output_path=None, width=640, height=480):
         output_path = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
 
     transform = ';'.join([
-        '[{i}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2[v{i}]'
+        '[{i}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1/1[v{i}]'
         .format(i=i, width=width, height=height) for i in range(len(paths))
     ])
     filter = ''.join(['[v{i}][{i}:a:0]'.format(i=i) for i in range(len(paths))])

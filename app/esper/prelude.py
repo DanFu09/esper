@@ -572,12 +572,18 @@ def concat_videos(paths, output_path=None, width=640, height=480):
     filter = ''.join(['[v{i}][{i}:a:0]'.format(i=i) for i in range(len(paths))])
     inputs = ' '.join(['-i {}'.format(p) for p in paths])
 
+    filter_script = "{transform}; {filter}concat=n={n}:v=1:a=1[outv][outa]".format(
+        transform=transform, filter=filter, n=len(paths))
+    script_file = tempfile.NamedTemporaryFile(suffix='.txt', delete=False).name
+    with open(script_file, 'w') as f:
+        f.write(filter_script)
+        f.close()
+
     cmd = '''
     ffmpeg -y {inputs} \
-    -filter_complex "{transform}; {filter}concat=n={n}:v=1:a=1[outv][outa]" \
+    -filter_complex_script {script_file} \
     -map "[outv]" -map "[outa]" {output}
-    '''.format(
-        transform=transform, inputs=inputs, filter=filter, n=len(paths), output=output_path)
+    '''.format(inputs=inputs, output=output_path, script_file=script_file)
     #     print(cmd)
     sp.check_call(cmd, shell=True)
 

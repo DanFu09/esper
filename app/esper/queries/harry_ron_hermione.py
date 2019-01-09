@@ -14,7 +14,7 @@ def harry_ron_hermione():
     from esper.rekall import intrvllists_to_result_bbox
 
     MIN_FACE_HEIGHT = 0.25
-    EPSILON = 0.1
+    EPSILON = 0.15
     NAMES = [ 'ron weasley', 'harry potter', 'hermione granger' ]
 
     # Annotate face rows with start and end frames and the video ID
@@ -58,6 +58,10 @@ def harry_ron_hermione():
                 same_height(epsilon=EPSILON) 
             ] },
             { 'start': 'face2', 'end': 'face3', 'predicates': [
+                same_value('y1', epsilon=EPSILON),
+                same_height(epsilon=EPSILON) 
+            ] },
+            { 'start': 'face1', 'end': 'face3', 'predicates': [
                 same_value('y1', epsilon=EPSILON),
                 same_height(epsilon=EPSILON) 
             ] }

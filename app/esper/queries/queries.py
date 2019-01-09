@@ -53,3 +53,6 @@ from .three_people import *
 from .harry_ron_hermione import *
 from .extreme_close_up import *
 from .kissing import *
+from .consecutive_short_shots import *
+from .caption_search import *
+from .all_captions import *

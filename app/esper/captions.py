@@ -107,9 +107,14 @@ def _get_all_segments(video_id, verbose=False):
             print('No document for video id: {}'.format(video_id), file=sys.stderr)
         return []
 
+    token_list = INDEX.tokens(doc_id)
+
     return [
-        (interval.start, interval.end, LEXICON[token])
-        for interval, token in zip(INDEX.intervals(doc_id), INDEX.tokens(doc_id))]
+        (interval.start, interval.end, [
+            LEXICON[token]
+            for token in INDEX.tokens(doc_id, interval.idx, interval.len)
+        ])
+        for interval in INDEX.intervals(doc_id)]
 
 
 def get_all_segments(video_ids=None):

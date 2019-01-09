@@ -183,7 +183,7 @@ class ObjectLabel(models.Model):
     name = base.CharField(unique=True)
 
 
-class Object(base.BoundingBox, models.Model):
+class Object(Labeled, base.BoundingBox, models.Model):
     frame = models.ForeignKey(Frame)
     label = models.ForeignKey(ObjectLabel)
     probability = models.FloatField()

@@ -18,13 +18,13 @@ def two_faces_up_close():
     from esper.rekall import intrvllists_to_result_with_objects, bbox_to_result_object
     from esper.stdlib import face_landmarks_to_dict
     
-    MAX_MOUTH_DIFF = 0.15
+    MAX_MOUTH_DIFF = 0.12
     MIN_FACE_CONFIDENCE = 0.8
     MIN_FACE_HEIGHT = 0.5
     MAX_FACE_HEIGHT_DIFF = 0.1
     MIN_FACE_OVERLAP_X = 0.05
     MIN_FACE_OVERLAP_Y = 0.2
-    MAX_FACE_OVERLAP_X_FRACTION = 0.7
+    MAX_FACE_OVERLAP_X_FRACTION = 0.6
     
     def map_payload(func):
         def map_fn(intvl):
@@ -85,11 +85,25 @@ def two_faces_up_close():
         mean1 = np.mean(mouth1, axis=0)
         mean2 = np.mean(mouth2, axis=0)
         return np.linalg.norm(mean1-mean2) <= MAX_MOUTH_DIFF
+
+    # Face is profile if both eyes are on the same side of the nose bridge horizontally.
+    def is_left_profile(f):
+        lm = f['landmarks']
+        nose_x = min(lm.nose_bridge()[:,0])
+        left = np.all(lm.left_eye()[:,0] >= nose_x)
+        right = np.all(lm.right_eye()[:,0] >= nose_x)
+        return left and right
+    def is_right_profile(f):
+        lm = f['landmarks']
+        nose_x = max(lm.nose_bridge()[:,0])
+        left = np.all(lm.left_eye()[:,0] <= nose_x)
+        right = np.all(lm.right_eye()[:,0] <= nose_x)
+        return left and right
         
     graph2 = {
         'nodes': [
-            {'name': 'left', 'predicates': [looking_right]},
-            {'name': 'right', 'predicates': [looking_left]},
+            {'name': 'left', 'predicates': [is_right_profile]},
+            {'name': 'right', 'predicates': [is_left_profile]},
         ],
         'edges': [
             {'start': 'left', 'end':'right', 'predicates':[
@@ -161,6 +175,6 @@ def two_faces_up_close():
     ).coalesce(payload_merge_op=lambda p1, p2: (p1[0], p1[1]+p2[1])).map(
         clip_to_last_frame_with_two_faces)
     
-    return intrvllists_to_result_with_objects(kissing_shots,
-                lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p] + [
-                   bbox_to_result_object(face, video_id) for face in p])
+    return intrvllists_to_result_with_objects(clipped_kissing_shots,
+                lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p[0]] + [
+                   bbox_to_result_object(face, video_id) for face in p[0]])

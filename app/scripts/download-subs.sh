@@ -4,6 +4,6 @@ if [ -d ~/esper ]; then
 else
     ROOT_DIR=/app
 fi
-SUBS=${ROOT_DIR}/data/subs/orig
+SUBS=${ROOT_DIR}/data/subs/aligned
 mkdir -p $SUBS
-gsutil -m cp gs://esper/movie-metadata/subs/*.srt $SUBS
+gsutil -m cp gs://esper/movies-aligned_srts/*.srt $SUBS

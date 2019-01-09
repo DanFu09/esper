@@ -4,7 +4,7 @@ from .queries import query
 
 @query("Kissing (rekall)")
 def two_faces_up_close():
-    # Takes 4min30s to run!
+    # Takes 7min to run!
     from query.models import Face, Shot
     from rekall.video_interval_collection import VideoIntervalCollection
     from rekall.parsers import in_array, bbox_payload_parser, merge_dict_parsers, dict_payload_parser
@@ -122,7 +122,44 @@ def two_faces_up_close():
       lambda kiss, shot: [(kiss.get_start(), shot.get_end(), kiss.get_payload())],
       predicate=overlaps(),
       working_window=1
-    ).coalesce().filter_length(min_length=12)
+    ).coalesce()
+
+    # Getting faces in the shot
+    print("Getting faces...")
+    def wrap_in_list(intvl):
+        intvl.payload = [intvl.payload]
+        return intvl
+
+    faces_qs2 = Face.objects.filter(frame__video_id__in=vids,probability__gte=MIN_FACE_CONFIDENCE)
+    total = faces_qs2.count()
+    faces2 = VideoIntervalCollection.from_django_qs(
+        faces_qs2.annotate(
+            min_frame=F('frame__number'),
+            max_frame=F('frame__number'),
+            video_id=F('frame__video_id')
+        ),
+        with_payload=in_array(merge_dict_parsers([
+            bbox_payload_parser(VideoIntervalCollection.django_accessor),
+            dict_payload_parser(VideoIntervalCollection.django_accessor, {'frame': 'min_frame'})
+        ])),
+        progress=True,
+        total = total
+    ).coalesce(payload_merge_op=payload_plus).map(wrap_in_list)
+    
+    def clip_to_last_frame_with_two_faces(intvl):
+        faces = intvl.get_payload()[1]
+        frame = [f[0]['frame'] for f in faces if len(f)==2]
+        if len(frame) > 0:
+            intvl.end = frame[-1]
+        return intvl
+    
+    clipped_kissing_shots = kissing_shots.merge(
+        faces2,
+        payload_merge_op = lambda p1, p2: (p1, p2),
+        predicate=overlaps(),
+        working_window=1
+    ).coalesce(payload_merge_op=lambda p1, p2: (p1[0], p1[1]+p2[1])).map(
+        clip_to_last_frame_with_two_faces)
     
     return intrvllists_to_result_with_objects(kissing_shots,
                 lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p] + [

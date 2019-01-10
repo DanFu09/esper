@@ -17,6 +17,7 @@ def two_faces_up_close():
     import esper.face_landmarks_wrapper as flw
     from esper.rekall import intrvllists_to_result_with_objects, bbox_to_result_object
     from esper.stdlib import face_landmarks_to_dict
+    from esper.captions import get_all_segments
     
     MAX_MOUTH_DIFF = 0.12
     MIN_FACE_CONFIDENCE = 0.8
@@ -162,7 +163,10 @@ def two_faces_up_close():
     
     def clip_to_last_frame_with_two_faces(intvl):
         faces = intvl.get_payload()[1]
-        frame = [f[0]['frame'] for f in faces if len(f)==2]
+        two_faces = [(f[0], f[1]) for f in faces if len(f)==2]
+        two_high_faces = [(a, b) for a, b in two_faces if min(a['y2']-a['y1'],b['y2']-b['y1'])>=MIN_FACE_HEIGHT]
+        frame = [a['frame'] for a,b in two_high_faces]
+        
         if len(frame) > 0:
             intvl.end = frame[-1]
         return intvl
@@ -174,7 +178,24 @@ def two_faces_up_close():
         working_window=1
     ).coalesce(payload_merge_op=lambda p1, p2: (p1[0], p1[1]+p2[1])).map(
         clip_to_last_frame_with_two_faces)
+
+    results = get_all_segments(vids)
+    fps_map = dict((i, Video.objects.get(id=i).fps) for i in vids)
+    caption_results = VideoIntervalCollection({
+        video_id: [(
+            word[0] * fps_map[video_id], # start frame
+            word[1] * fps_map[video_id], # end frame
+            word[2]) # payload is the word
+            for word in words]
+        for video_id, words in results
+    })
+    kissing_without_words = clipped_kissing_shots.minus(
+            caption_results)
+    kissing_final = kissing_without_words.map(
+            lambda intvl: (int(intvl.start),
+                int(intvl.end), intvl.payload)
+            ).coalesce().filter_length(min_length=12)
     
-    return intrvllists_to_result_with_objects(clipped_kissing_shots,
+    return intrvllists_to_result_with_objects(kissing_final,
                 lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p[0]] + [
                    bbox_to_result_object(face, video_id) for face in p[0]])

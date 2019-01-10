@@ -109,12 +109,14 @@ def _get_all_segments(video_id, verbose=False):
 
     token_list = INDEX.tokens(doc_id)
 
-    return [
+    result = []
+    for interval in INDEX.intervals(doc_id):
+        result.append(
         (interval.start, interval.end, [
-            LEXICON[token]
+            LEXICON.decode(token)
             for token in INDEX.tokens(doc_id, interval.idx, interval.len)
-        ])
-        for interval in INDEX.intervals(doc_id)]
+        ]))
+    return result
 
 
 def get_all_segments(video_ids=None):

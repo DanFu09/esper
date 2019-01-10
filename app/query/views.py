@@ -116,10 +116,8 @@ def srt_to_vtt(s, subs_shift=0):
 # Get subtitles for video
 def subtitles(request):
     video_id = request.GET.get('video')
-    video = Video.objects.get(id=video_id)
 
-    basename = os.path.splitext(os.path.basename(video.path))[0]
-    sub_path = '/app/data/subs/orig/{}.srt'.format(basename)
+    sub_path = '/app/data/subs/aligned/{}.srt'.format(video_id)
 
     s = open(sub_path, 'rb').read().decode('utf-8')
     vtt = srt_to_vtt(s, 0)

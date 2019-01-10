@@ -63,9 +63,10 @@ class Video(base.Video):
 
     small_dataset = models.BooleanField(default=False)
     decode_errors = models.BooleanField(default=False)
+    incomplete_film = models.BooleanField(default=False)
 
     def get_stride(self):
-        return int(math.ceil(self.fps) / 2)
+        return int(math.round(self.fps) / 2)
 
     def item_name(self):
         return '.'.join(self.path.split('/')[-1].split('.')[:-1])
@@ -103,6 +104,7 @@ class Frame(base.Frame):
     sharpness = models.FloatField(null=True)
     saturation = models.FloatField(null=True)
     shot_scale = models.ForeignKey(ShotScale, default=1)
+    regularly_sampled = models.BooleanField(default=False)
 
 
 class Labeler(base.Labeler):

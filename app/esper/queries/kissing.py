@@ -1,9 +1,8 @@
 from esper.prelude import *
-from esper.rekall import *
 from .queries import query
 
 @query("Kissing (rekall)")
-def two_faces_up_close():
+def kissing():
     # Takes 7min to run!
     from query.models import Face, Shot
     from rekall.video_interval_collection import VideoIntervalCollection
@@ -15,17 +14,18 @@ def two_faces_up_close():
     from rekall.face_landmark_predicates import looking_left, looking_right
     from rekall.bbox_predicates import height_at_least, same_height
     import esper.face_landmarks_wrapper as flw
+    from esper.captions import get_all_segments
     from esper.rekall import intrvllists_to_result_with_objects, bbox_to_result_object
     from esper.stdlib import face_landmarks_to_dict
-    from esper.captions import get_all_segments
     
     MAX_MOUTH_DIFF = 0.12
     MIN_FACE_CONFIDENCE = 0.8
-    MIN_FACE_HEIGHT = 0.5
+    MIN_FACE_HEIGHT = 0.4
     MAX_FACE_HEIGHT_DIFF = 0.1
     MIN_FACE_OVERLAP_X = 0.05
     MIN_FACE_OVERLAP_Y = 0.2
-    MAX_FACE_OVERLAP_X_FRACTION = 0.6
+    MAX_FACE_OVERLAP_X_FRACTION = 0.7
+    MIN_FACE_ANGLE = 0.1
     
     def map_payload(func):
         def map_fn(intvl):
@@ -35,11 +35,7 @@ def two_faces_up_close():
     
     def get_landmarks(faces):
         ids = [face['id'] for face in faces]
-        try:
-            landmarks = flw.get(Face.objects.filter(id__in=ids))
-        except:
-            print("Error getting landmarks:", ids)
-            return []
+        landmarks = flw.get(Face.objects.filter(id__in=ids))
         for face, landmark in zip(faces, landmarks):
             face['landmarks'] = landmark
         return faces
@@ -72,12 +68,10 @@ def two_faces_up_close():
                 lambda f1, f2: f1['y2'] > f2['y1'] and f1['y1'] < f2['y2'],  # No face is entirely above another
                 same_height(MAX_FACE_HEIGHT_DIFF),
                 lambda f1, f2: (f1['x2']-f2['x1'])/max(f1['x2']-f1['x1'], f2['x2']-f2['x1']) < MAX_FACE_OVERLAP_X_FRACTION
-
             ]},
         ]
     }
     
-
     def mouths_are_close(lm1, lm2):
         select_outer=[2,3,4,8,9,10]
         select_inner=[1,2,3,5,6,7]
@@ -86,7 +80,7 @@ def two_faces_up_close():
         mean1 = np.mean(mouth1, axis=0)
         mean2 = np.mean(mouth2, axis=0)
         return np.linalg.norm(mean1-mean2) <= MAX_MOUTH_DIFF
-
+    
     # Face is profile if both eyes are on the same side of the nose bridge horizontally.
     def is_left_profile(f):
         lm = f['landmarks']
@@ -100,15 +94,46 @@ def two_faces_up_close():
         left = np.all(lm.left_eye()[:,0] <= nose_x)
         right = np.all(lm.right_eye()[:,0] <= nose_x)
         return left and right
+    
+    # Line is ax+by+c=0
+    def project_point_to_line(pt, a, b, c):
+        x0,y0=pt[0], pt[1]
+        d=a*a+b*b
+        x=(b*(b*x0-a*y0)-a*c)/d
+        y=(a*(-b*x0+a*y0)-b*c)/d
+        return np.array([x,y])
+    
+    # Positive if facing right
+    def signed_face_angle(lm):
+        center_line_indices = [27,28,32,33,34,51,62,66,57]
+        data = lm.landmarks[center_line_indices]
+        fit = np.polyfit(data[:,0], data[:,1], 1)
+        # y = ax+b
+        a,b = fit[0], fit[1]
+        A = project_point_to_line(lm.landmarks[center_line_indices[0]], a,-1,b)
+        B = project_point_to_line(lm.landmarks[center_line_indices[-1]], a,-1,b)
+        AB = B-A
+        AB = AB / np.linalg.norm(AB)
+        C = np.mean(lm.nose_bridge()[2:4], axis=0)
+        AC = C-A
+        AC = AC / np.linalg.norm(AC)
+        return np.cross(AB, AC)
+
         
     graph2 = {
         'nodes': [
-            {'name': 'left', 'predicates': [is_right_profile]},
-            {'name': 'right', 'predicates': [is_left_profile]},
+            {'name': 'left', 'predicates': [
+                lambda f: signed_face_angle(f['landmarks']) > MIN_FACE_ANGLE
+#                 is_right_profile
+            ]},
+            {'name': 'right', 'predicates': [
+                lambda f: signed_face_angle(f['landmarks']) < -MIN_FACE_ANGLE
+#                 is_left_profile
+            ]},
         ],
         'edges': [
             {'start': 'left', 'end':'right', 'predicates':[
-                lambda l, r: mouths_are_close(l['landmarks'], r['landmarks'])
+                lambda l, r: mouths_are_close(l['landmarks'], r['landmarks']),
             ]}
         ]
     }
@@ -116,7 +141,6 @@ def two_faces_up_close():
     mf_up_close = faces.filter(payload_satisfies(
         scene_graph(graph, exact=True))).map(map_payload(get_landmarks)).filter(
         payload_satisfies(scene_graph(graph2, exact=True)))
-
     vids = mf_up_close.get_allintervals().keys()
     # Merge with shots
     shots_qs = Shot.objects.filter(
@@ -138,13 +162,13 @@ def two_faces_up_close():
       predicate=overlaps(),
       working_window=1
     ).coalesce()
-
+    
     # Getting faces in the shot
-    print("Getting faces...")
     def wrap_in_list(intvl):
         intvl.payload = [intvl.payload]
         return intvl
-
+    
+    print("Getting faces...")
     faces_qs2 = Face.objects.filter(frame__video_id__in=vids,probability__gte=MIN_FACE_CONFIDENCE)
     total = faces_qs2.count()
     faces2 = VideoIntervalCollection.from_django_qs(
@@ -177,8 +201,8 @@ def two_faces_up_close():
         predicate=overlaps(),
         working_window=1
     ).coalesce(payload_merge_op=lambda p1, p2: (p1[0], p1[1]+p2[1])).map(
-        clip_to_last_frame_with_two_faces)
-
+        clip_to_last_frame_with_two_faces).filter_length(min_length=12)
+    
     results = get_all_segments(vids)
     fps_map = dict((i, Video.objects.get(id=i).fps) for i in vids)
     caption_results = VideoIntervalCollection({
@@ -195,7 +219,11 @@ def two_faces_up_close():
             lambda intvl: (int(intvl.start),
                 int(intvl.end), intvl.payload)
             ).coalesce().filter_length(min_length=12)
+
+    def payload_to_objects(p, video_id):
+        return [face_landmarks_to_dict(face['landmarks']) for face in p[0]] + [
+                    bbox_to_result_object(face, video_id) for face in p[0]]
     
-    return intrvllists_to_result_with_objects(kissing_final,
-                lambda p, video_id: [face_landmarks_to_dict(face['landmarks']) for face in p[0]] + [
-                   bbox_to_result_object(face, video_id) for face in p[0]])
+    
+    return intrvllists_to_result_with_objects(kissing_final.get_allintervals(),
+                lambda p, vid: payload_to_objects(p, vid), stride=1)

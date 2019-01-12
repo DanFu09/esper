@@ -35,3 +35,7 @@ video-analysis
 **/*.pkl
 **/*_pb2.py
 **/*.sav
+**/*.pdf
+**/*.svg
+**/*.csv
+**/*.png

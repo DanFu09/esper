@@ -6,7 +6,7 @@ import os
 import json
 import re
 
-CAPTION_METADATA_DIR = '../data/subs/meta'
+CAPTION_METADATA_DIR = '/app/data/subs/meta'
 
 def clean_speaker(speaker):
     speaker = speaker.lower()

@@ -64,6 +64,7 @@ class Video(base.Video):
     small_dataset = models.BooleanField(default=False)
     decode_errors = models.BooleanField(default=False)
     incomplete_film = models.BooleanField(default=False)
+    ignore_film = models.BooleanField(default=False)
 
     def get_stride(self):
         return int(round(self.fps) / 2)

@@ -66,7 +66,7 @@ class Video(base.Video):
     incomplete_film = models.BooleanField(default=False)
 
     def get_stride(self):
-        return int(math.round(self.fps) / 2)
+        return int(round(self.fps) / 2)
 
     def item_name(self):
         return '.'.join(self.path.split('/')[-1].split('.')[:-1])
@@ -124,7 +124,7 @@ class ActorGender(models.Model):
     gender = models.ForeignKey(Gender)
 
 class Shot(Track):
-    pass
+    cinematic = models.BooleanField(default=False)
 
 class Pose(Labeled, base.Pose, models.Model):
     frame = models.ForeignKey(Frame)

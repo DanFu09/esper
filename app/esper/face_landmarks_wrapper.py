@@ -92,3 +92,14 @@ def get(faces_qs):
         LandmarksWrapper(np.array(landmarks_id_bytes[1]), landmarks_id_bytes[0], LABELER)
         for landmarks_id_bytes in result
     ]
+
+def get_from_face_ids(fids):
+    result = _LANDMARKS_DATA.get(fids)
+
+    assert len(result) == len(fids), "{} != {}".format(
+        len(result), len(fids))
+
+    return [
+        LandmarksWrapper(np.array(landmarks_id_bytes[1]), landmarks_id_bytes[0], LABELER)
+        for landmarks_id_bytes in result
+    ]

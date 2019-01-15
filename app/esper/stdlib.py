@@ -21,7 +21,7 @@ from esper.prelude import collect, BUCKET
 from query.base_models import Track
 from query.models import \
     Face, FaceGender, FaceIdentity, Labeler, Video, Frame, Gender, Tag, Object, \
-    Identity, Pose, FaceLandmarks, Character, Actor
+    Identity, Pose, FaceLandmarks, Character, Actor, ObjectLabel
 import django.apps
 
 def access(obj: Any, path: str) -> Any:
@@ -57,6 +57,14 @@ def bbox_to_dict(f: Any) -> Dict:
         d['labeler_id'] = f.labeler.id
 
     return d
+
+
+def object_to_dict(f: Any) -> Dict:
+    d = bbox_to_dict(f)
+    d['object_id'] = f.label_id
+
+    return d
+
 
 def gender_to_dict(f: Any) -> Dict:
     d = bbox_to_dict(f.face)
@@ -187,8 +195,10 @@ def qs_to_result(result: QuerySet,
         if not shuffle and deterministic_order:
             result = result.order_by(frame_path + '__video', frame_path + '__number')
 
-        if cls is Face or cls is Object:
+        if cls is Face:
             fn = bbox_to_dict
+        elif cls is Object:
+            fn = object_to_dict
         elif cls is FaceGender:
             fn = gender_to_dict
         elif cls is FaceIdentity:
@@ -362,6 +372,7 @@ def result_with_metadata(result):
     gender_ids = set()
     actor_ids = set()
     character_ids = set()
+    object_ids = set()
     for group in result['result']:
         for obj in group['elements']:
             video_ids.add(obj['video'])
@@ -397,6 +408,9 @@ def result_with_metadata(result):
                         if 'character_ids' in bbox:
                             character_ids.add(bbox['character_id'])
 
+                        if 'object_ids' in bbox:
+                            object_ids.add(bbox['object_id'])
+
     def to_dict(qs):
         return {t['id']: t for t in list(qs.values())}
 
@@ -407,6 +421,7 @@ def result_with_metadata(result):
     identities = to_dict(Identity.objects.all())
     actors = to_dict(Actor.objects.all())
     characters = to_dict(Character.objects.all())
+    objects = to_dict(ObjectLabel.objects.all())
 
     return {
         'groups': result['result'],
@@ -419,6 +434,7 @@ def result_with_metadata(result):
             'genders': genders,
             'identities': identities,
             'actors': actors,
-            'characters': characters
+            'characters': characters,
+            'objects': objects
         }
     }

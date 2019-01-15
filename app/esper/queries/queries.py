@@ -37,6 +37,7 @@ from .faces_with_gender import *
 from .all_videos import *
 from .all_poses import *
 from .all_face_landmarks import *
+from .all_objects import *
 from .person_x import *
 from .bright_frames import *
 from .dark_frames import *

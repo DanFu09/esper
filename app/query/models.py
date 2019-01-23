@@ -126,6 +126,8 @@ class ActorGender(models.Model):
 
 class Shot(Track):
     cinematic = models.BooleanField(default=False)
+    transition_in_max_frame = models.IntegerField(null=True)
+    transition_out_min_frame = models.IntegerField(null=True)
 
 class Pose(Labeled, base.Pose, models.Model):
     frame = models.ForeignKey(Frame)

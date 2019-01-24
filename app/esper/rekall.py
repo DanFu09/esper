@@ -156,8 +156,6 @@ def intrvllists_to_result(intrvllists, color="red", video_order=None):
     full_count = 0
     for video in intrvllists:
         intrvllist = intrvllists[video].get_intervals()
-        if len(intrvllist) == 0:
-            continue
         materialized_results[video] = [
             {'track': intrvl.get_payload(), 'min_frame': intrvl.get_start(),
                 'max_frame': intrvl.get_end(), 'video': video}
@@ -254,8 +252,6 @@ def add_intrvllists_to_result(result, intrvllists, color="red"):
     full_count = 0
     for video in intrvllists:
         intrvllist = intrvllists[video].get_intervals()
-        if len(intrvllist) == 0:
-            continue
         materialized_results[video] = [
             {'track': intrvl.get_payload(), 'min_frame': intrvl.get_start(),
                 'max_frame': intrvl.get_end(), 'video': video}

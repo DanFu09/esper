@@ -129,6 +129,9 @@ class Shot(Track):
     transition_in_max_frame = models.IntegerField(null=True)
     transition_out_min_frame = models.IntegerField(null=True)
 
+class LabeledInterval(Track):
+    pass
+
 class Pose(Labeled, base.Pose, models.Model):
     frame = models.ForeignKey(Frame)
 

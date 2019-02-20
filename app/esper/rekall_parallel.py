@@ -26,7 +26,8 @@ def _update_pbar(pbar, work):
         pbar.update(work)
     return update
 
-def par_do(func, vids, parallel=True, chunksize=1, profile=False, fork=False):
+def par_do(func, vids, parallel=True, num_workers=mp.cpu_count(),
+           chunksize=1, profile=False, fork=False):
     """
     func takes a video_id and returns an IntervalSet3D. It cannot make
         reference to any objects outside of its scope.
@@ -48,7 +49,9 @@ def par_do(func, vids, parallel=True, chunksize=1, profile=False, fork=False):
             django.db.connections.close_all()
         else:
             method = "spawn"
-        with mp.pool.Pool(initializer=_worker_init,
+        with mp.pool.Pool(
+                processes = num_workers,
+                initializer=_worker_init,
                 initargs=(func,),
                 context=mp.get_context(method)) as pool:
             with tqdm(total=len(vids)) as pbar:

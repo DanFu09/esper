@@ -1,80 +1,93 @@
 import django
-django.setup()
-
+import cloudpickle
 import multiprocessing as mp
-from rekall.video_interval_collection_3d import VideoIntervalCollection3D
-from rekall.interval_set_3d_utils import perf_count
-from tqdm import tqdm
-import random
-from math import ceil
+import os
 
-def _inline_do(func, vids, profile):
-    with perf_count("Running inline", enable=profile):
-        return VideoIntervalCollection3D({
-            v: func(v) for v in tqdm(vids)})
+from rekall.runtime import (
+        AbstractWorkerPool,
+        Runtime,
+        SpawnedProcessPool,
+        get_forked_process_pool_factory,
+        get_spawned_process_pool_factory)
 
-def _worker_init(context):
-    global GLOBAL_CONTEXT
-    GLOBAL_CONTEXT = context
+def get_worker_pool_factory_for_jupyter(num_workers=mp.cpu_count()):
+    fork_factory = get_forked_process_pool_factory(num_workers)
+    # Forked Django Database connections will not work. Hence we close all
+    # connections before forking to allow child processes to establish their
+    # own connections.
+    def worker_pool_factory(fn):
+        django.db.connections.close_all()
+        return fork_factory(fn)
+    return worker_pool_factory
 
-def _apply_function(vids):
-    func = GLOBAL_CONTEXT
-    return {vid: func(vid) for vid in vids}
+# Jupyter Notebook needs to use forking so that child processes can correctly
+# connect to Jupyter.
+def get_runtime_for_jupyter(num_workers=mp.cpu_count()):
+    return Runtime(get_worker_pool_factory_for_jupyter(num_workers))
 
-def _update_pbar(pbar, work):
-    def update(result):
-        pbar.update(work)
-    return update
+def _set_up_django():
+    # set up django context
+    import django
+    django.setup()
 
-def par_do(func, vids, parallel=True, num_workers=mp.cpu_count(),
-           chunksize=1, profile=False, fork=False):
-    """
-    func takes a video_id and returns an IntervalSet3D. It cannot make
-        reference to any objects outside of its scope.
-    vids is a list of video_id
-    chunksize denotes the batch size for each task that is sent to a worker.
-    fork specifies whether to use fork to create child processes. Calling in a
-        Jupyter Notebook requires this to be true, but may create problems with
-        multithreaded libraries.
-    Returns a VideoIntervalCollection3D
-    """
-    if not parallel:
-        return _inline_do(func, vids, profile)
+def get_worker_pool_factory_for_script(num_workers=mp.cpu_count()):
+    def worker_pool_factory(fn):
+        return SpawnedProcessPool(fn, num_workers, initializer=_set_up_django)
+    return worker_pool_factory
 
-    with perf_count("Running in Parallel", enable=profile):
-        if fork:
-            method = "fork"
-            # Existing connections will not work in forked process.
-            # They need to create connections themselves.
-            django.db.connections.close_all()
-        else:
-            method = "spawn"
-        with mp.pool.Pool(
-                processes = num_workers,
-                initializer=_worker_init,
-                initargs=(func,),
-                context=mp.get_context(method)) as pool:
-            with tqdm(total=len(vids)) as pbar:
-                with perf_count("Dispatching tasks", enable=profile):
-                    futures = []
-                    random.shuffle(vids)
-                    num_tasks = int(ceil(len(vids)/chunksize))
-                    for task_i in range(num_tasks):
-                        start = chunksize* task_i
-                        end = start + chunksize
-                        task = vids[start:end]
-                        futures.append(pool.apply_async(
-                            _apply_function, args=(task,),
-                            callback=_update_pbar(pbar, chunksize),
-                            error_callback = _update_pbar(pbar, chunksize)))
-                videos_and_results = [f.get() for f in futures]
-        output = {}
-        for result_dict in videos_and_results:
-            keys = result_dict.keys()
-            for key in keys:
-                if key in output:
-                    raise RuntimeError(
-                            "duplicated results found for video {0}".format(
-                                key))
-            output.update(result_dict)
-        return VideoIntervalCollection3D(output)
+# Spawning is preferred because it plays well with multithreading libraries,
+# but it does not work in Jupyter Notebook.
+def get_runtime_for_script(num_workers=mp.cpu_count()):
+    return Runtime(get_worker_pool_factory_for_script(num_workers))
+
+# A Worker Pool that writes to a shared storage instead of sending results to
+# master process in memory
+class _WithStorage(AbstractWorkerPool):
+    class Result():
+        def __init__(self, filename_future):
+            self._filename_future = filename_future
+        def get(self):
+            filename = self._filename_future.get()
+            with open(filename, 'rb') as f:
+                return cloudpickle.load(f)
+
+    def __init__(self, fn, pool_factory, output_dir):
+        os.makedirs(output_dir)
+        self._pool = pool_factory(_WithStorage.wrap(fn, output_dir))
+
+    # Wraps the query function to write to output_dir
+    @staticmethod
+    def wrap(query, output_dir):
+        def fn(vids):
+            results = query(vids)
+            filename = os.path.join(
+                    output_dir,
+                    "{0}({1}).pickle".format(vids[0], len(vids)))
+            with open(filename, 'wb') as f:
+                cloudpickle.dump(results, f)
+            return filename
+        return fn
+
+    def apply_async(self, vids, callback):
+        filename_future = self._pool.apply_async(vids, callback)
+        return _WithStorage.Result(filename_future)
+    
+    def shut_down(self):
+        return self._pool.shut_down()
+
+# A WorkerPoolFactory that writes results to storage
+class WorkerPoolWithStorageFactory():
+    def __init__(self, output_dir, factory):
+        self._call_index = 0
+        self._output_dir = output_dir
+        self._factory = factory
+
+    def get_output_dir(self):
+        return os.path.join(self._output_dir, str(self._call_index))
+
+    def __call__(self, fn):
+        output_dir = self.get_output_dir()
+        self._call_index += 1
+        return _WithStorage(fn, self._factory, output_dir)
+
+

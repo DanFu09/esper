@@ -126,6 +126,7 @@ class IPythonClusterPool():
 def get_worker_pool_factory_for_ipython_cluster(client):
     if len(client) == 0:
         raise RuntimeError("There is no worker in the cluster")
+    client.direct_view().use_cloudpickle()
     def factory(fn):
         return IPythonClusterPool(client, fn)
     return factory

@@ -68,9 +68,9 @@ class _WithStorage(AbstractWorkerPool):
             return filename
         return fn
 
-    def apply_async(self, vids, callback):
-        filename_future = self._pool.apply_async(vids, callback)
-        return _WithStorage.Result(filename_future)
+    def map(self, tasks, done):
+        return [_WithStorage.Result(filename_future) for
+                filename_future in self._pool.map(tasks, done)]
     
     def shut_down(self):
         return self._pool.shut_down()
@@ -90,4 +90,46 @@ class WorkerPoolWithStorageFactory():
         self._call_index += 1
         return _WithStorage(fn, self._factory, output_dir)
 
+def _annotate_future(future, vids, done):
+    class ChunkedFutureWrapper():
+        def __init__(self, chunked_future):
+            self._f = chunked_future
 
+        def get(self):
+            for result in self._f.get():
+                return result
+
+    def cb(f):
+        e = f.exception()
+        done(vids, e)
+    future.add_done_callback(cb)
+    return ChunkedFutureWrapper(future)
+
+# WorkerPool using a ipython cluster
+class IPythonClusterPool():
+    def __init__(self, client, fn):
+        self._client = client
+        self._fn = fn
+
+    def shut_down(self):
+        # The cluster is long running process and should not be shut down.
+        pass
+
+    def map(self, tasks, done):
+        view = self._client.load_balanced_view()
+        amr = view.map(self._fn, tasks, ordered=False, chunksize=1)
+        task_ids = amr.msg_ids
+        assert(len(tasks) == len(task_ids))
+        return  [_annotate_future(self._client.get_result(tid), vids, done)
+                   for vids, tid in zip(tasks, task_ids)]
+
+def get_worker_pool_factory_for_ipython_cluster(client):
+    if len(client) == 0:
+        raise RuntimeError("There is no worker in the cluster")
+    client.direct_view().use_cloudpickle()
+    def factory(fn):
+        return IPythonClusterPool(client, fn)
+    return factory
+
+def get_runtime_for_ipython_cluster(client):
+    return Runtime(get_worker_pool_factory_for_ipython_cluster(client))

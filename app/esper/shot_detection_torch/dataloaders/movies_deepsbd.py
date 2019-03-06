@@ -9,7 +9,8 @@ from query.models import Video
 from tqdm import tqdm
 
 class DeepSBDDataset(Dataset):
-    def __init__(self, shots, window_size=16, stride=8, size=128, verbose=False):
+    def __init__(self, shots, window_size=16, stride=8, size=128, verbose=False,
+            preload=True, logits=False):
         """Constrcutor for ShotDetectionDataset.
         
         Args:
@@ -17,6 +18,8 @@ class DeepSBDDataset(Dataset):
             then the interval is not an actual shot and just needs to be included in the dataset.
         """
         self.window_size = window_size
+        self.preload = preload
+        self.logits = logits
         items = set()
         frame_nums = {}
         
@@ -37,7 +40,7 @@ class DeepSBDDataset(Dataset):
             items_intrvls[video_id] = []
             for intrvl in clips.get_intervallist(video_id).get_intervals():
                 items_intrvls[video_id] += [
-                    (f, f + window_size, 0)
+                    (f, f + window_size, 0 if not logits else (1, 0, 0))
                     for f in range(intrvl.start, intrvl.end - stride, stride)
                 ]
         items_col = VideoIntervalCollection(items_intrvls)
@@ -46,7 +49,7 @@ class DeepSBDDataset(Dataset):
             shot_boundaries,
             predicate=during_inv()
         ).map(
-            lambda intrvl: (intrvl.start, intrvl.end, 2)
+            lambda intrvl: (intrvl.start, intrvl.end, 2 if not logits else (0, 0, 1))
         )
         
         items_w_labels = items_col.minus(
@@ -74,20 +77,30 @@ class DeepSBDDataset(Dataset):
             Normalize(get_mean(1), (1, 1, 1))
         ])
         
-        iterator = tqdm(frame_nums) if verbose else frame_nums
-        # Load frames into memory
-        self.frames = {
-            video_id: {
-                'frame_nums': sorted(list(frame_nums[video_id])),
-                'frames': [
-                    self.transform(f)
-                    for f in Video.objects.get(id=video_id).for_scannertools().frames(
-                        sorted(list(frame_nums[video_id]))
-                    )
-                ]
+        if preload:
+            iterator = tqdm(frame_nums) if verbose else frame_nums
+            # Load frames into memory
+            self.frames = {
+                video_id: {
+                    'frame_nums': sorted(list(frame_nums[video_id])),
+                    'frames': [
+                        self.transform(f)
+                        for f in Video.objects.get(id=video_id).for_scannertools().frames(
+                            sorted(list(frame_nums[video_id]))
+                        )
+                    ]
+                }
+                for video_id in iterator
             }
-            for video_id in iterator
-        }
+
+    def set_items(self, items):
+        """
+        @items is a list of tuples video_id, start_frame, end_frame, label
+
+        labels can be classes (0, 1, 2) or logits
+        """
+        assert(self.preload == False)
+        self.items = items
     
     def __len__(self):
         return len(self.items)
@@ -100,15 +113,16 @@ class DeepSBDDataset(Dataset):
         """
         video_id, start_frame, end_frame, label = self.items[idx]
         
-        start_index = self.frames[video_id]['frame_nums'].index(start_frame)
-        img_tensors = self.frames[video_id]['frames'][start_index:start_index + self.window_size]
-        
-#         img_tensors = [
-#             self.transform(f)
-#             for f in Video.objects.get(id=video_id).for_scannertools().frames(
-#                 list(range(frame_num - self.window_size, frame_num + self.window_size + 1))
-#             )
-#         ]
+        if self.preload:
+            start_index = self.frames[video_id]['frame_nums'].index(start_frame)
+            img_tensors = self.frames[video_id]['frames'][start_index:start_index + self.window_size]
+        else:
+            img_tensors = [
+                self.transform(f)
+                for f in Video.objects.get(id=video_id).for_scannertools().frames(
+                    list(range(start_frame, end_frame))
+                )
+            ]
         
         return torch.stack(img_tensors).permute(1, 0, 2, 3), label, (video_id, start_frame, end_frame)
 #         return label, (video_id, start_frame, end_frame)

@@ -15,6 +15,8 @@ from torch.utils.data import Dataset, DataLoader
 from torch import optim
 from torch.optim import lr_scheduler
 
+import numpy as np
+
 from collections import OrderedDict
 import scannertools as st
 
@@ -31,6 +33,11 @@ TRAINING_SET = '40000_min'
 LOCAL_PATH = '/data'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
 MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak'
+PER_ITERATION_LOGS = 'average_f1'
+PER_FOLD_LOGS = 'per_fold_perf'
+ITERATION_START = 345000
+ITERATION_END = 400000 + 1
+ITERATION_STRIDE = 5000
 
 if LOCAL_PATH is None:
     st.init_storage(os.environ['BUCKET'])
@@ -98,12 +105,12 @@ def get_label(res_tensor):
         labels.append(np.argmax(row))
     return labels
 
-def test_deepsbd(model, dataloader):
+def test_deepsbd(model, dataloader, verbose=True):
     preds = []
     labels = []
     outputs = []
     i = 0
-    for clip_tensor, l, _ in tqdm(dataloader):
+    for clip_tensor, l, _ in (tqdm(dataloader) if verbose else dataloader):
         o = model(clip_tensor.to(device))
         l = torch.transpose(torch.stack(l).to(device), 0, 1).float()
 
@@ -116,27 +123,57 @@ def test_deepsbd(model, dataloader):
     preds = [2 if p == 2 else 0 for p in preds]
         
     precision, recall, f1, tp, tn, fp, fn = prf1_array(2, 0, labels, preds)
-    print("Precision: {}, Recall: {}, F1: {}".format(precision, recall, f1))
-    print("TP: {}, TN: {}, FP: {}, FN: {}".format(tp, tn, fp, fn))
+    if verbose:
+        print("Precision: {}, Recall: {}, F1: {}".format(precision, recall, f1))
+        print("TP: {}, TN: {}, FP: {}, FN: {}".format(tp, tn, fp, fn))
     
-    return preds, labels, outputs
+    return precision, recall, f1, tp, tn, fp, fn
 
-# test K folds
-for i in range(0, 5):
-    # import pdb; pdb.set_trace() 
-    # load 
-    weights = torch.load(os.path.join(
-        MODEL_SAVE_PATH,
-        'fold{}_{}_iteration.pth'.format(
-            i + 1 if TRAINING_SET == 'kfolds' else 1,
-            (400 if TRAINING_SET == 'kfolds'
-            else 2800 if TRAINING_SET == '400_min'
-            else 59000 if TRAINING_SET == '4000_min'
-            else 320000)
-        )))['state_dict']
-    deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
-    deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
-    test_dataset = deepsbd_datasets_weak_testing[i]
-    dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=16)
-    test_deepsbd(deepsbd_resnet_model_no_clipshots, dataloader)
+f_iteration = open(os.path.join(MODEL_SAVE_PATH, PER_ITERATION_LOGS), 'a')
+f_folds = open(os.path.join(MODEL_SAVE_PATH, PER_FOLD_LOGS), 'a')
+
+for iteration in range(ITERATION_START, ITERATION_END, ITERATION_STRIDE):
+    fold_data = []
+    print(iteration)
+    # test K folds
+    for i in range(0, 5):
+        # import pdb; pdb.set_trace() 
+        # load 
+        weights = torch.load(os.path.join(
+            MODEL_SAVE_PATH,
+            'fold{}_{}_iteration.pth'.format(
+                i + 1 if TRAINING_SET == 'kfolds' else 1,
+                iteration
+            )))['state_dict']
+        deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
+        deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
+        test_dataset = deepsbd_datasets_weak_testing[i]
+        dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=16)
+        precision, recall, f1, tp, tn, fp, fn = test_deepsbd(deepsbd_resnet_model_no_clipshots, dataloader)
+        fold_data.append([precision, recall, f1, tp, tn, fp, fn])
+        
+        f_folds.write(
+                'Iteration {}\t'
+                'Fold {}\t'
+                'pre {pre:.4f}\t'
+                'rec {rec:.4f}\t'
+                'f1 {f1: .4f}\t'
+                'TP {tp} '
+                'TN {tn} '
+                'FP {fp} '
+                'FN {fn}\n'.format(
+                    iteration, i+1, pre=precision, rec=recall, f1=f1, tp=tp,
+                    tn=tn, fp=fp, fn=fn
+                ))
+
+    f1s = [
+        fold_info[2]
+        for fold_info in fold_data
+    ]
+    f_iteration.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+        iteration, f1s[0], f1s[1], f1s[2], f1s[3], f1s[4], np.mean(f1s)
+    ))
+
+    f_folds.flush()
+    f_iteration.flush()
 

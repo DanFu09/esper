@@ -26,21 +26,22 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 # TRAINING_SET = 'kfolds'
 # TRAINING_SET = '400_min'
 # TRAINING_SET = '4000_min'
-TRAINING_SET = '40000_min'
-# TRAINING_SET = 'all_movies'
+# TRAINING_SET = '40000_min'
+TRAINING_SET = 'all_movies'
 
 LOCAL_PATH = '/data'
 PRETRAIN_PATH = '/app/notebooks/learning/models/resnet-18-kinetics.pth'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
 WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/noisy_labels_all_windows.npy'
-MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak'
+MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_all_movies_weak'
 SEGS_400_MIN_PATH = '/app/data/400_minute_train.pkl'
 SEGS_4000_MIN_PATH = '/app/data/4000_minute_train.pkl'
 SEGS_40000_MIN_PATH = '/app/data/40000_minute_train.pkl'
+SEGS_ALL_VIDEOS_PATH = '/app/data/all_videos_train.pkl'
 
 # only works for 400_min, 4000_min, all_movies
-# CONTINUE_PATH = None
-CONTINUE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak/fold1_270000_iteration.pth'
+CONTINUE_PATH = None
+# CONTINUE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak/fold1_270000_iteration.pth'
 
 if LOCAL_PATH is None:
     st.init_storage(os.environ['BUCKET'])
@@ -134,13 +135,14 @@ if TRAINING_SET == 'kfolds':
             for intrvl in new_items.get_intervallist(video_id).get_intervals()
         ]
         deepsbd_datasets_weak_training.append(data)
-elif TRAINING_SET in ['400_min', '4000_min', '40000_min']:
+elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
     with open(SEGS_400_MIN_PATH if TRAINING_SET == '400_min'
             else SEGS_4000_MIN_PATH if TRAINING_SET == '4000_min'
-            else SEGS_40000_MIN_PATH, 
+            else SEGS_40000_MIN_PATH if TRAINING_SET == '40000_min'
+            else SEGS_ALL_VIDEOS_PATH,
               'rb') as f:
         segments = VideoIntervalCollection(pickle.load(f))
-        
+
     print('Creating dataset')
     data = movies_deepsbd_data.DeepSBDDataset(segments, verbose=True,
                                            preload=False, logits=True,
@@ -397,7 +399,7 @@ if TRAINING_SET == 'kfolds':
                 criterion, optimizer, scheduler, fold_num = i + 1,
                 log_file = log_file
             )
-elif TRAINING_SET in ['400_min', '4000_min', '40000_min']:
+elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
     with open(os.path.join(MODEL_SAVE_PATH, '{}.log'.format(TRAINING_SET)), 'a') as log_file:
     #if True:
     #    log_file = None
@@ -432,29 +434,30 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min']:
         train_iterations(
             (4000 if TRAINING_SET == '400_min'
             else 60000 if TRAINING_SET == '4000_min'
-            else 400000),
+            else 400000 if TRAINING_SET == '40000_min'
+            else 800000),
             training_dataloader, 
             deepsbd_resnet_model_no_clipshots, 
             criterion, optimizer, scheduler,
             log_file = log_file, start_iter = start_iter, save_every=5000
         )
 
-print('Testing')
-            
-# test K folds
-for i in range(0, 5):
-    # load 
-    weights = torch.load(os.path.join(
-        MODEL_SAVE_PATH,
-        'fold{}_{}_iteration.pth'.format(
-            i + 1 if TRAINING_SET == 'kfolds' else 1,
-            (400 if TRAINING_SET == 'kfolds'
-            else 4000 if TRAINING_SET == '400_min'
-            else 60000 if TRAINING_SET == '4000_min'
-            else 400000)
-        )))['state_dict']
-    deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
-    deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
-    test_dataset = deepsbd_datasets_weak_testing[i]
-    dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=16)
-    test_deepsbd(deepsbd_resnet_model_no_clipshots, dataloader)
+#print('Testing')
+#            
+## test K folds
+#for i in range(0, 5):
+#    # load 
+#    weights = torch.load(os.path.join(
+#        MODEL_SAVE_PATH,
+#        'fold{}_{}_iteration.pth'.format(
+#            i + 1 if TRAINING_SET == 'kfolds' else 1,
+#            (400 if TRAINING_SET == 'kfolds'
+#            else 4000 if TRAINING_SET == '400_min'
+#            else 60000 if TRAINING_SET == '4000_min'
+#            else 400000)
+#        )))['state_dict']
+#    deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
+#    deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
+#    test_dataset = deepsbd_datasets_weak_testing[i]
+#    dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=16)
+#    test_deepsbd(deepsbd_resnet_model_no_clipshots, dataloader)

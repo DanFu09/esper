@@ -18,7 +18,6 @@ from torch.optim import lr_scheduler
 import numpy as np
 
 from collections import OrderedDict
-import scannertools as st
 
 import esper.shot_detection_torch.models.deepsbd_resnet as deepsbd_resnet
 import esper.shot_detection_torch.models.deepsbd_alexnet as deepsbd_alexnet
@@ -26,25 +25,20 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 
 # TRAINING_SET = 'kfolds'
 # TRAINING_SET = '400_min'
-# TRAINING_SET = '4000_min'
-TRAINING_SET = '40000_min'
+TRAINING_SET = '4000_min'
+# TRAINING_SET = '40000_min'
 # TRAINING_SET = 'all_movies'
 
-LOCAL_PATH = '/data'
+LOCAL_PATH = '/app/data'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
-MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak'
+MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_high_pre'
 PER_ITERATION_LOGS = 'average_f1'
 PER_FOLD_LOGS = 'per_fold_perf'
-ITERATION_START = 345000
-ITERATION_END = 400000 + 1
-ITERATION_STRIDE = 5000
+ITERATION_START = 1000
+ITERATION_END = 60000 + 1
+ITERATION_STRIDE = 1000
 
-if LOCAL_PATH is None:
-    st.init_storage(os.environ['BUCKET'])
-else:
-    st.init_storage()
-
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 print('Initialized constants')
 
@@ -148,7 +142,12 @@ for iteration in range(ITERATION_START, ITERATION_END, ITERATION_STRIDE):
         deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
         deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
         test_dataset = deepsbd_datasets_weak_testing[i]
-        dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=16)
+        dataloader = DataLoader(
+            test_dataset,
+            batch_size=16,
+            shuffle=False,
+            num_workers=48,
+            pin_memory=True)
         precision, recall, f1, tp, tn, fp, fn = test_deepsbd(deepsbd_resnet_model_no_clipshots, dataloader)
         fold_data.append([precision, recall, f1, tp, tn, fp, fn])
         

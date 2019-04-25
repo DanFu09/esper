@@ -8,7 +8,8 @@ from torch.utils.data import Dataset
 from query.models import Video
 from tqdm import tqdm
 import os
-import scannertools as st
+import storehouse
+import hwang
 
 class DeepSBDDataset(Dataset):
     def __init__(self, shots, window_size=16, stride=8, size=128, verbose=False,
@@ -23,6 +24,9 @@ class DeepSBDDataset(Dataset):
         self.preload = preload
         self.logits = logits
         self.local_path = local_path
+        self.storehouse_backend = storehouse.StorageBackend.make_from_config(
+            storehouse.StorageConfig.make_posix_config()    
+        )
         items = set()
         frame_nums = {}
         
@@ -82,22 +86,23 @@ class DeepSBDDataset(Dataset):
             Normalize(get_mean(1), (1, 1, 1))
         ])
         
-        if preload:
-            iterator = tqdm(frame_nums) if verbose else frame_nums
-            # Load frames into memory
-            self.frames = {
-                video_id: {
-                    'frame_nums': sorted(list(frame_nums[video_id])),
-                    'frames': [
-                        self.transform(f)
-                        for f in (Video.objects.get(id=video_id).for_scannertools() if local_path is None
-                            else st.Video(os.path.join(local_path, Video.objects.get(id=video_id).path))).frames(
-                            sorted(list(frame_nums[video_id]))
-                        )
-                    ]
-                }
-                for video_id in iterator
-            }
+        # BROKEN BY NEW SCANNER
+        # if preload:
+        #     iterator = tqdm(frame_nums) if verbose else frame_nums
+        #     # Load frames into memory
+        #     self.frames = {
+        #         video_id: {
+        #             'frame_nums': sorted(list(frame_nums[video_id])),
+        #             'frames': [
+        #                 self.transform(f)
+        #                 for f in (Video.objects.get(id=video_id).for_scannertools() if local_path is None
+        #                     else st.Video(os.path.join(local_path, Video.objects.get(id=video_id).path))).frames(
+        #                     sorted(list(frame_nums[video_id]))
+        #                 )
+        #             ]
+        #         }
+        #         for video_id in iterator
+        #     }
 
     def set_items(self, items):
         """
@@ -125,10 +130,19 @@ class DeepSBDDataset(Dataset):
             img_tensors = self.frames[video_id]['frames'][start_index:start_index + self.window_size]
         else:
 #             print((video_id, start_frame, end_frame, Video.objects.get(id=video_id).num_frames))
+            # img_tensors = [
+            #     self.transform(f)
+            #     for f in (Video.objects.get(id=video_id).for_scannertools() if self.local_path is None
+            #         else st.Video(os.path.join(self.local_path, path))).frames(
+            #         list(range(start_frame, end_frame))
+            #     )
+            # ]
             img_tensors = [
                 self.transform(f)
-                for f in (Video.objects.get(id=video_id).for_scannertools() if self.local_path is None
-                    else st.Video(os.path.join(self.local_path, path))).frames(
+                for f in hwang.Decoder(storehouse.RandomReadFile(
+                    self.storehouse_backend,
+                    os.path.join(self.local_path, path).encode('ascii')
+                )).retrieve(
                     list(range(start_frame, end_frame))
                 )
             ]

@@ -17,7 +17,6 @@ from torch import optim
 from torch.optim import lr_scheduler
 
 from collections import OrderedDict
-import scannertools as st
 
 import esper.shot_detection_torch.models.deepsbd_resnet as deepsbd_resnet
 import esper.shot_detection_torch.models.deepsbd_alexnet as deepsbd_alexnet
@@ -25,15 +24,15 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 
 # TRAINING_SET = 'kfolds'
 # TRAINING_SET = '400_min'
-# TRAINING_SET = '4000_min'
+TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
-TRAINING_SET = 'all_movies'
+# TRAINING_SET = 'all_movies'
 
-LOCAL_PATH = '/data'
+LOCAL_PATH = '/app/data'
 PRETRAIN_PATH = '/app/notebooks/learning/models/resnet-18-kinetics.pth'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
-WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/noisy_labels_all_windows.npy'
-MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_all_movies_weak'
+WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/majority_vote_labels_all_windows_high_pre.npy'
+MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_high_pre'
 SEGS_400_MIN_PATH = '/app/data/400_minute_train.pkl'
 SEGS_4000_MIN_PATH = '/app/data/4000_minute_train.pkl'
 SEGS_40000_MIN_PATH = '/app/data/40000_minute_train.pkl'
@@ -42,11 +41,6 @@ SEGS_ALL_VIDEOS_PATH = '/app/data/all_videos_train.pkl'
 # only works for 400_min, 4000_min, all_movies
 CONTINUE_PATH = None
 # CONTINUE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_40000_min_weak/fold1_270000_iteration.pth'
-
-if LOCAL_PATH is None:
-    st.init_storage(os.environ['BUCKET'])
-else:
-    st.init_storage()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -410,9 +404,10 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
         django.db.connections.close_all()
         training_dataloader = DataLoader(
             training_datasets,
-            num_workers=16,
+            num_workers=48,
             shuffle=False,
             batch_size=16,
+            pin_memory=True,
             sampler=fold_sampler
         )
 
@@ -439,7 +434,7 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
             training_dataloader, 
             deepsbd_resnet_model_no_clipshots, 
             criterion, optimizer, scheduler,
-            log_file = log_file, start_iter = start_iter, save_every=5000
+            log_file = log_file, start_iter = start_iter, save_every=1000
         )
 
 #print('Testing')

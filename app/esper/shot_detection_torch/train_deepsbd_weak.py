@@ -9,6 +9,8 @@ import multiprocessing as mp
 from query.models import Video, Shot
 from tqdm import tqdm
 import django
+import sys
+import os
 
 import torch
 from torch import nn
@@ -28,11 +30,19 @@ TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
 # TRAINING_SET = 'all_movies'
 
+# WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/majority_vote_labels_all_windows_downsampled.npy'
+# MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_downsampled'
+WEAK_LABELS_PATH = sys.argv[1]
+MODEL_SAVE_PATH = sys.argv[2]
+
+if not os.path.exists(WEAK_LABELS_PATH):
+    "Weak labels path {} does not exist".format(WEAK_LABELS_PATH)
+if not os.path.exists(MODEL_SAVE_PATH):
+    os.makedirs(MODEL_SAVE_PATH)
+
 LOCAL_PATH = '/app/data'
 PRETRAIN_PATH = '/app/notebooks/learning/models/resnet-18-kinetics.pth'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
-WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/majority_vote_labels_all_windows_high_pre.npy'
-MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_high_pre'
 SEGS_400_MIN_PATH = '/app/data/400_minute_train.pkl'
 SEGS_4000_MIN_PATH = '/app/data/4000_minute_train.pkl'
 SEGS_40000_MIN_PATH = '/app/data/40000_minute_train.pkl'
@@ -140,7 +150,7 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
     print('Creating dataset')
     data = movies_deepsbd_data.DeepSBDDataset(segments, verbose=True,
                                            preload=False, logits=True,
-                                           local_path=LOCAL_PATH)
+                                           local_path=LOCAL_PATH, stride=16)
     print('Collecting')
     items_collected = collect(
         data.items,
@@ -428,7 +438,7 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
 
         train_iterations(
             (4000 if TRAINING_SET == '400_min'
-            else 60000 if TRAINING_SET == '4000_min'
+            else 30000 if TRAINING_SET == '4000_min'
             else 400000 if TRAINING_SET == '40000_min'
             else 800000),
             training_dataloader, 

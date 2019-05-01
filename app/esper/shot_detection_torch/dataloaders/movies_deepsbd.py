@@ -32,7 +32,9 @@ class DeepSBDDataset(Dataset):
         
         shot_boundaries = shots.map(
             lambda intrvl: (intrvl.start, intrvl.start, intrvl.payload)
-        ).filter(lambda intrvl: intrvl.payload != -1)
+        ).set_union(
+            shots.map(lambda intrvl: (intrvl.end + 1, intrvl.end + 1, intrvl.payload))
+        ).coalesce().filter(lambda intrvl: intrvl.payload != -1)
         
         clips = shots.dilate(1).coalesce().dilate(-1).map(
             lambda intrvl: (
@@ -106,7 +108,7 @@ class DeepSBDDataset(Dataset):
 
     def set_items(self, items):
         """
-        @items is a list of tuples video_id, start_frame, end_frame, label
+        @items is a list of tuples video_id, start_frame, end_frame, label, path
 
         labels can be classes (0, 1, 2) or logits
         """

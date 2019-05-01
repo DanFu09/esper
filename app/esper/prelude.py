@@ -1,4 +1,4 @@
-from scannerpy import ProtobufGenerator, Config
+from scannerpy import Config
 from storehouse import StorageConfig, StorageBackend
 from query.base_models import Track, BoundingBox
 from django.db import connections, connection
@@ -43,7 +43,6 @@ from collections import defaultdict
 
 # Access to Scanner protobufs
 cfg = Config()
-proto = ProtobufGenerator(cfg)
 
 # Logging config
 log = logging.getLogger('esper')

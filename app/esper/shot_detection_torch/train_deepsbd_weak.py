@@ -26,16 +26,17 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 
 # TRAINING_SET = 'kfolds'
 # TRAINING_SET = '400_min'
-TRAINING_SET = '4000_min'
+# TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
-# TRAINING_SET = 'all_movies'
+TRAINING_SET = 'all_movies'
+# TRAINING_SET = 'ground_truth'
 
 # WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/majority_vote_labels_all_windows_downsampled.npy'
 # MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_downsampled'
 WEAK_LABELS_PATH = sys.argv[1]
 MODEL_SAVE_PATH = sys.argv[2]
 
-if not os.path.exists(WEAK_LABELS_PATH):
+if TRAINING_SET != 'ground_truth' and not os.path.exists(WEAK_LABELS_PATH):
     "Weak labels path {} does not exist".format(WEAK_LABELS_PATH)
 if not os.path.exists(MODEL_SAVE_PATH):
     os.makedirs(MODEL_SAVE_PATH)
@@ -47,6 +48,10 @@ SEGS_400_MIN_PATH = '/app/data/400_minute_train.pkl'
 SEGS_4000_MIN_PATH = '/app/data/4000_minute_train.pkl'
 SEGS_40000_MIN_PATH = '/app/data/40000_minute_train.pkl'
 SEGS_ALL_VIDEOS_PATH = '/app/data/all_videos_train.pkl'
+VAL_WINDOWS = '/app/data/shot_detection_weak_labels/validation_windows_same_val_test.pkl'
+TEST_WINDOWS = '/app/data/shot_detection_weak_labels/test_windows_same_val_test.pkl'
+Y_VAL = '/app/data/shot_detection_weak_labels/Y_val_windows_downsampled_same_val_test.npy'
+Y_TEST = '/app/data/shot_detection_weak_labels/Y_test_windows_downsampled_same_val_test.npy'
 
 # only works for 400_min, 4000_min, all_movies
 CONTINUE_PATH = None
@@ -77,23 +82,24 @@ for fold in folds:
 print('Loaded test data')
     
 # load weak labels
-with open(WEAK_LABELS_PATH, 'rb') as f:
-    weak_labels_windows = np.load(f)
+if TRAINING_SET != 'ground_truth':
+    with open(WEAK_LABELS_PATH, 'rb') as f:
+        weak_labels_windows = np.load(f)
     
-print('Loaded weak labels from disk')
-    
-weak_labels_collected = collect(
-    weak_labels_windows,
-    lambda row: row[0][0]
-)
+    print('Loaded weak labels from disk')
+        
+    weak_labels_collected = collect(
+        weak_labels_windows,
+        lambda row: row[0][0]
+    )
 
-weak_labels_col = VideoIntervalCollection({
-    video_id: [
-        (row[0][1] ,row[0][2], row[1])
-        for row in weak_labels_collected[video_id]
-    ]
-    for video_id in tqdm(list(weak_labels_collected.keys()))
-})
+    weak_labels_col = VideoIntervalCollection({
+        video_id: [
+            (row[0][1] ,row[0][2], row[1])
+            for row in weak_labels_collected[video_id]
+        ]
+        for video_id in tqdm(list(weak_labels_collected.keys()))
+    })
 
 print('Finished collecting weak labels')
 
@@ -181,7 +187,34 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
         for intrvl in new_items.get_intervallist(video_id).get_intervals()
     ]
     deepsbd_datasets_weak_training = [data]
+elif TRAINING_SET == 'ground_truth':
+    # Load DeepSBD datasets for validaton.
+    # Use validation for training
+    with open(VAL_WINDOWS, 'rb') as f:
+        val_windows_by_video_id = pickle.load(f)
+    with open(Y_VAL, 'rb') as f:
+        Y_val = np.load(f)
+    paths = {
+        video_id: Video.objects.get(id=video_id).path
+        for video_id in list(set([
+            vid for vid, start, end in val_windows_by_video_id    
+        ]))
+    }
 
+    def val_to_logits(val):
+        """ If val is 1, positive; if val is 2, negative """
+        return (0, 0, 1) if val == 1 else (1, 0, 0)
+
+    shots = VideoIntervalCollection.from_django_qs(Shot.objects.filter(
+        labeler__name__contains="manual"
+    ))
+    data_val = movies_deepsbd_data.DeepSBDDataset(shots, verbose=True,
+            preload=False, logits=True, local_path=LOCAL_PATH, stride=16)
+    data_val.set_items([
+        (video_id, start, end, val_to_logits(label), paths[video_id])
+        for (video_id, start, end), label in zip(val_windows_by_video_id, Y_val)
+    ])
+    deepsbd_datasets_weak_training = [data_val]
 
 print('Finished constructing datasets')
     
@@ -403,7 +436,7 @@ if TRAINING_SET == 'kfolds':
                 criterion, optimizer, scheduler, fold_num = i + 1,
                 log_file = log_file
             )
-elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
+elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies', 'ground_truth']:
     with open(os.path.join(MODEL_SAVE_PATH, '{}.log'.format(TRAINING_SET)), 'a') as log_file:
     #if True:
     #    log_file = None
@@ -440,11 +473,12 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
             (4000 if TRAINING_SET == '400_min'
             else 30000 if TRAINING_SET == '4000_min'
             else 400000 if TRAINING_SET == '40000_min'
-            else 800000),
+            else 800000 if TRAINING_SET == 'all_movies'
+            else 5000),
             training_dataloader, 
             deepsbd_resnet_model_no_clipshots, 
             criterion, optimizer, scheduler,
-            log_file = log_file, start_iter = start_iter, save_every=1000
+            log_file = log_file, start_iter = start_iter, save_every=5000
         )
 
 #print('Testing')

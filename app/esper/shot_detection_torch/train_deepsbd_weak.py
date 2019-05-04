@@ -189,7 +189,9 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
     deepsbd_datasets_weak_training = [data]
 elif TRAINING_SET == 'ground_truth':
     # Load DeepSBD datasets for validaton.
-    # Use validation for training
+    # Use validation for training.
+    # Split by folds
+    deepsbd_datasets_weak_training = []
     with open(VAL_WINDOWS, 'rb') as f:
         val_windows_by_video_id = pickle.load(f)
     with open(Y_VAL, 'rb') as f:
@@ -208,13 +210,15 @@ elif TRAINING_SET == 'ground_truth':
     shots = VideoIntervalCollection.from_django_qs(Shot.objects.filter(
         labeler__name__contains="manual"
     ))
-    data_val = movies_deepsbd_data.DeepSBDDataset(shots, verbose=True,
-            preload=False, logits=True, local_path=LOCAL_PATH, stride=16)
-    data_val.set_items([
-        (video_id, start, end, val_to_logits(label), paths[video_id])
-        for (video_id, start, end), label in zip(val_windows_by_video_id, Y_val)
-    ])
-    deepsbd_datasets_weak_training = [data_val]
+
+    for fold in folds:
+        data_val = movies_deepsbd_data.DeepSBDDataset(shots, verbose=True,
+                preload=False, logits=True, local_path=LOCAL_PATH, stride=16)
+        data_val.set_items([
+            (video_id, start, end, val_to_logits(label), paths[video_id])
+            for (video_id, start, end), label in zip(val_windows_by_video_id, Y_val) if video_id in fold
+        ])
+        deepsbd_datasets_weak_training.append(data_val)
 
 print('Finished constructing datasets')
     
@@ -405,7 +409,7 @@ deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.to(device)
 
 print('Training')
 
-if TRAINING_SET == 'kfolds':
+if TRAINING_SET in ['kfolds', 'ground_truth']:
     # train K folds
     for i in range(5):
         with open(os.path.join(MODEL_SAVE_PATH, '{}.log'.format(i+1)), 'w') as log_file:
@@ -416,9 +420,10 @@ if TRAINING_SET == 'kfolds':
 
             training_dataloader = DataLoader(
                 training_datasets,
-                num_workers=0,
+                num_workers=48,
                 shuffle=False,
                 batch_size=16,
+                pin_memory=True
                 sampler=fold_sampler
             )
 
@@ -431,12 +436,12 @@ if TRAINING_SET == 'kfolds':
             scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, 'min',patience=60000)
 
             train_iterations(
-                400, training_dataloader, 
+                5000, training_dataloader, 
                 deepsbd_resnet_model_no_clipshots, 
                 criterion, optimizer, scheduler, fold_num = i + 1,
-                log_file = log_file
+                log_file = log_file, start_iter = 0, save_every=1000
             )
-elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies', 'ground_truth']:
+elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
     with open(os.path.join(MODEL_SAVE_PATH, '{}.log'.format(TRAINING_SET)), 'a') as log_file:
     #if True:
     #    log_file = None

@@ -28,6 +28,7 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
 # TRAINING_SET = 'all_movies'
+# TRAINING_SET = 'ground_truth'
 
 # MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_downsampled'
 MODEL_SAVE_PATH = sys.argv[1]
@@ -64,21 +65,50 @@ deepsbd_resnet_model_no_clipshots = deepsbd_resnet.resnet18(
 )
 deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.to(device).train()    
 
-if TRAINING_SET == "kfolds":
+if TRAINING_SET in ["kfolds", "ground_truth"]:
     # Load DeepSBD datasets for each fold. This is used for testing.
     deepsbd_datasets_weak_testing = []
-    for fold in folds:
-        shots_in_fold_qs = Shot.objects.filter(
-            labeler__name__contains='manual',
-            video_id__in = fold
-        )
-        shots_in_fold = VideoIntervalCollection.from_django_qs(shots_in_fold_qs)
-        shots_per_fold.append(shots_in_fold)
-        
-        data = movies_deepsbd_data.DeepSBDDataset(shots_in_fold, verbose=True, 
-                                                  preload=False, logits=True,
-                                                 local_path=LOCAL_PATH)
-        deepsbd_datasets_weak_testing.append(data)
+    if not SAME_VAL_TEST:
+        for fold in folds:
+            shots_in_fold_qs = Shot.objects.filter(
+                labeler__name__contains='manual',
+                video_id__in = fold
+            )
+            shots_in_fold = VideoIntervalCollection.from_django_qs(shots_in_fold_qs)
+            shots_per_fold.append(shots_in_fold)
+            
+            data = movies_deepsbd_data.DeepSBDDataset(shots_in_fold, verbose=True, 
+                                                      preload=False, logits=True,
+                                                     local_path=LOCAL_PATH)
+            deepsbd_datasets_weak_testing.append(data)
+    else:
+        with open(VAL_WINDOWS, 'rb') as f:
+            val_windows_by_video_id = pickle.load(f)
+        with open(Y_VAL, 'rb') as f:
+            Y_val = np.load(f)
+        paths = {
+            video_id: Video.objects.get(id=video_id).path
+            for video_id in list(set([
+                vid for vid, start, end in val_windows_by_video_id    
+            ]))
+        }
+
+        def val_to_logits(val):
+            """ If val is 1, positive; if val is 2, negative """
+            return (0, 0, 1) if val == 1 else (1, 0, 0)
+
+        shots = VideoIntervalCollection.from_django_qs(Shot.objects.filter(
+            labeler__name__contains="manual"
+        ))
+
+        for fold in folds:
+            data_val = movies_deepsbd_data.DeepSBDDataset(shots, verbose=True,
+                    preload=False, logits=True, local_path=LOCAL_PATH, stride=16)
+            data_val.set_items([
+                (video_id, start, end, val_to_logits(label), paths[video_id])
+                for (video_id, start, end), label in zip(val_windows_by_video_id, Y_val) if video_id in fold
+            ])
+            deepsbd_datasets_weak_testing.append(data_val)
 else:
     if not SAME_VAL_TEST:
         # Load DeepSBD datasets for testing
@@ -208,7 +238,7 @@ def test_deepsbd(model, dataloader, verbose=True):
 f_iteration = open(os.path.join(MODEL_SAVE_PATH, PER_ITERATION_LOGS), 'a')
 f_folds = open(os.path.join(MODEL_SAVE_PATH, PER_FOLD_LOGS), 'a')
 
-if TRAINING_SET == "kfolds":
+if TRAINING_SET in ["kfolds", "ground_truth"]:
     for iteration in range(ITERATION_START, ITERATION_END, ITERATION_STRIDE):
         fold_data = []
         print(iteration)

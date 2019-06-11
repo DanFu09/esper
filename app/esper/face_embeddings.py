@@ -104,7 +104,7 @@ def knn(targets=None, ids=None, k=2 ** 31, max_threshold=100.):
         raise ValueError('No targets given')
 
 
-def kmeans(ids, k=25):
+def kmeans(ids, k=25, max_iterations=1000):
     """
     Run kmeans on all face_ids in ids.
     
@@ -114,7 +114,7 @@ def kmeans(ids, k=25):
     Returns:
         List of (face_id, cluster number) pairs
     """
-    return _EMB_DATA.kmeans(ids, k)
+    return _EMB_DATA.kmeans(ids, k, max_iterations)
 
 
 def logreg(ids, labels, min_thresh=0., max_thresh=1., num_epochs=10, 

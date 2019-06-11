@@ -7,10 +7,13 @@ import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 from query.models import Video
 from tqdm import tqdm
+import os
+import storehouse
+import hwang
 
 class DeepSBDDataset(Dataset):
     def __init__(self, shots, window_size=16, stride=8, size=128, verbose=False,
-            preload=True, logits=False):
+            preload=True, logits=False, local_path=None):
         """Constrcutor for ShotDetectionDataset.
         
         Args:
@@ -20,12 +23,18 @@ class DeepSBDDataset(Dataset):
         self.window_size = window_size
         self.preload = preload
         self.logits = logits
+        self.local_path = local_path
+        self.storehouse_backend = storehouse.StorageBackend.make_from_config(
+            storehouse.StorageConfig.make_posix_config()    
+        )
         items = set()
         frame_nums = {}
         
         shot_boundaries = shots.map(
             lambda intrvl: (intrvl.start, intrvl.start, intrvl.payload)
-        ).filter(lambda intrvl: intrvl.payload != -1)
+        ).set_union(
+            shots.map(lambda intrvl: (intrvl.end + 1, intrvl.end + 1, intrvl.payload))
+        ).coalesce().filter(lambda intrvl: intrvl.payload != -1)
         
         clips = shots.dilate(1).coalesce().dilate(-1).map(
             lambda intrvl: (
@@ -57,18 +66,20 @@ class DeepSBDDataset(Dataset):
         ).set_union(items_w_boundaries)
 
         for video_id in items_w_labels.get_allintervals():
+            path = Video.objects.get(id=video_id).path
             frame_nums[video_id] = set()
             for intrvl in items_w_labels.get_intervallist(video_id).get_intervals():
                 items.add((
                     video_id,
                     intrvl.start,
                     intrvl.end,
-                    intrvl.payload
+                    intrvl.payload,
+                    path
                 ))
                 for f in range(intrvl.start, intrvl.end):
                     frame_nums[video_id].add(f)
 
-        self.items = sorted(list(items))
+        self.items = sorted(list(items), key=lambda item: (item[0], item[1], item[2]))
         
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
@@ -77,25 +88,27 @@ class DeepSBDDataset(Dataset):
             Normalize(get_mean(1), (1, 1, 1))
         ])
         
-        if preload:
-            iterator = tqdm(frame_nums) if verbose else frame_nums
-            # Load frames into memory
-            self.frames = {
-                video_id: {
-                    'frame_nums': sorted(list(frame_nums[video_id])),
-                    'frames': [
-                        self.transform(f)
-                        for f in Video.objects.get(id=video_id).for_scannertools().frames(
-                            sorted(list(frame_nums[video_id]))
-                        )
-                    ]
-                }
-                for video_id in iterator
-            }
+        # BROKEN BY NEW SCANNER
+        # if preload:
+        #     iterator = tqdm(frame_nums) if verbose else frame_nums
+        #     # Load frames into memory
+        #     self.frames = {
+        #         video_id: {
+        #             'frame_nums': sorted(list(frame_nums[video_id])),
+        #             'frames': [
+        #                 self.transform(f)
+        #                 for f in (Video.objects.get(id=video_id).for_scannertools() if local_path is None
+        #                     else st.Video(os.path.join(local_path, Video.objects.get(id=video_id).path))).frames(
+        #                     sorted(list(frame_nums[video_id]))
+        #                 )
+        #             ]
+        #         }
+        #         for video_id in iterator
+        #     }
 
     def set_items(self, items):
         """
-        @items is a list of tuples video_id, start_frame, end_frame, label
+        @items is a list of tuples video_id, start_frame, end_frame, label, path
 
         labels can be classes (0, 1, 2) or logits
         """
@@ -111,15 +124,27 @@ class DeepSBDDataset(Dataset):
         Returns self.window_size frames before the indexed frame to self.window_size
             frames after the indexed frame
         """
-        video_id, start_frame, end_frame, label = self.items[idx]
+        video_id, start_frame, end_frame, label, path = self.items[idx]
+#         print(video_id, start_frame, end_frame)
         
         if self.preload:
             start_index = self.frames[video_id]['frame_nums'].index(start_frame)
             img_tensors = self.frames[video_id]['frames'][start_index:start_index + self.window_size]
         else:
+#             print((video_id, start_frame, end_frame, Video.objects.get(id=video_id).num_frames))
+            # img_tensors = [
+            #     self.transform(f)
+            #     for f in (Video.objects.get(id=video_id).for_scannertools() if self.local_path is None
+            #         else st.Video(os.path.join(self.local_path, path))).frames(
+            #         list(range(start_frame, end_frame))
+            #     )
+            # ]
             img_tensors = [
                 self.transform(f)
-                for f in Video.objects.get(id=video_id).for_scannertools().frames(
+                for f in hwang.Decoder(storehouse.RandomReadFile(
+                    self.storehouse_backend,
+                    os.path.join(self.local_path, path).encode('ascii')
+                )).retrieve(
                     list(range(start_frame, end_frame))
                 )
             ]

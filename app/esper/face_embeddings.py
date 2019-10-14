@@ -114,7 +114,7 @@ def kmeans(ids, k=25, max_iterations=1000):
     Returns:
         List of (face_id, cluster number) pairs
     """
-    return _EMB_DATA.kmeans(ids, k, max_iterations)
+    return _EMB_DATA.kmeans(ids, k) #FIXME: version issues ,  max_iterations)
 
 
 def logreg(ids, labels, min_thresh=0., max_thresh=1., num_epochs=10, 

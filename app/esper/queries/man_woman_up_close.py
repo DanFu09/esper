@@ -18,7 +18,7 @@ def man_woman_up_close():
     MIN_FACE_HEIGHT = 0.6
 
     # Annotate face rows with start and end frames and the video ID
-    faces_with_gender= FaceGender.objects.annotate(
+    faces_with_gender= FaceGender.objects.filter(face__frame__video__name=video_name).annotate(
         min_frame=F('face__frame__number'),
         max_frame=F('face__frame__number'),
         video_id=F('face__frame__video_id'),

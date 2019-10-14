@@ -38,7 +38,11 @@ labeled_videos = set([videotag.video_id
         for videotag in VideoTag.objects.filter(tag=LABELED_TAG).all()])
 all_videos = set([video.id for video in Video.objects.all()])
 #video_ids = sorted(list(all_videos.difference(labeled_videos).difference(ids_to_exclude)))
-video_ids=sorted(list(all_videos.difference(ids_to_exclude)))
+#video_ids=sorted(list(all_videos.difference(ids_to_exclude)))
+video_ids = sorted(list([
+    video.id
+    for video in Video.objects.filter(small_dataset=True).all()
+]))
 
 print(video_ids, len(labeled_videos), len(video_ids))
 
@@ -117,23 +121,28 @@ if True:
     for video, framelist, facelist, featurelist in tqdm(zip(videos, frames, faces, features), total=len(videos)):
         new_features = []
         for frame, faces_in_frame, features_in_frame in zip(framelist, facelist.load(), featurelist.load()):
-            if (video.id, frame) in frames_in_db_already:
+            if (frame % 12) != 0:
                 continue
+            #if (video.id, frame) in frames_in_db_already:
+            #    continue
+            frame_obj = Frame.objects.get(video_id=video.id, number=frame)
             if len(faces_in_frame) == 0:
                 continue
             face_objs = list(Face.objects.filter(frame__video_id=video.id).filter(frame__number=frame).all())
             for bbox, feature_vec in zip(faces_in_frame, features_in_frame):
                 face_obj = None
                 for obj in face_objs:
-                    if (abs(obj.bbox_x1 - bbox.x1) < .000001 and
-                        abs(obj.bbox_x2 - bbox.x2) < .000001 and
-                        abs(obj.bbox_y1 - bbox.y1) < .000001 and
-                        abs(obj.bbox_y2 - bbox.y2) < .000001 and
-                        abs(obj.probability - bbox.score) < .000001):
+                    if (abs(obj.bbox_x1 - bbox.x1) < .00001 and
+                        abs(obj.bbox_x2 - bbox.x2) < .00001 and
+                        abs(obj.bbox_y1 - bbox.y1) < .00001 and
+                        abs(obj.bbox_y2 - bbox.y2) < .00001 and
+                        abs(obj.probability - bbox.score) < .00001):
                         face_obj = obj
                         break
                 if face_obj is None:
                     print("Couldn't find face {} in {}".format(bbox, face_objs))
+                if face_obj.id <= 8903581:
+                    continue
                 new_features.append(FaceFeatures(
                     face=face_obj,
                     features=json.dumps(feature_vec.tolist()).encode(),
@@ -141,32 +150,30 @@ if True:
                 ))
         FaceFeatures.objects.bulk_create(new_features, batch_size=10000)
     
-
-    for video, framelist in tqdm(zip(videos, frames), total=len(videos)):
-        new_frame_tags = []
-        frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
-        for frame in frame_objs:
-            if (video.id, frame.number) in frames_in_db_already:
-                continue
-            new_frame_tags.append(
-                    Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
-        if len(new_frame_tags) == 0:
-            continue
-        Frame.tags.through.objects.bulk_create(new_frame_tags, batch_size=10000)
+        #new_frame_tags = []
+        #frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
+        #for frame in frame_objs:
+        #    if (video.id, frame.number) in frames_in_db_already:
+        #        continue
+        #    new_frame_tags.append(
+        #            Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
+        #if len(new_frame_tags) == 0:
+        #    continue
+        #Frame.tags.through.objects.bulk_create(new_frame_tags, batch_size=10000)
 
     # Get the videos that already have the tag
-    videos_tagged_already = set([
-        vtag.video_id
-        for vtag in VideoTag.objects.filter(tag=LABELED_TAG).all()
-    ])
+    #videos_tagged_already = set([
+    #    vtag.video_id
+    #    for vtag in VideoTag.objects.filter(tag=LABELED_TAG).all()
+    #])
 
-    # Tag this video as being labeled
-    new_videotags = [
-        VideoTag(video=video, tag=LABELED_TAG)
-        for video in videos
-        if video.id not in videos_tagged_already
-    ]
-    VideoTag.objects.bulk_create(new_videotags)
+    ## Tag this video as being labeled
+    #new_videotags = [
+    #    VideoTag(video=video, tag=LABELED_TAG)
+    #    for video in videos
+    #    if video.id not in videos_tagged_already
+    #]
+    #VideoTag.objects.bulk_create(new_videotags)
 
     print("Finished putting everything in the database")
 

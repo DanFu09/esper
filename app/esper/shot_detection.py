@@ -97,7 +97,7 @@ def update_database_with_faces(faces, frames, video, labeler, tag):
     new_faces = []
     new_frame_tags = []
     for bbox_list, frame, frame_obj in zip(faces, frames, frame_objs):
-        if frame_obj.id in frames_labeled_already:
+        if frame_obj.id in frames_labeled_already or (frame % 12) == 0:
             continue
         for bbox in bbox_list:
             new_faces.append(Face(
@@ -117,9 +117,10 @@ def update_database_with_faces(faces, frames, video, labeler, tag):
     with transaction.atomic():
         Frame.tags.through.objects.bulk_create(new_frame_tags)
         Face.objects.bulk_create(new_faces)
-        VideoTag.objects.get_or_create(video=video, tag=tag)
+        #VideoTag.objects.get_or_create(video=video, tag=tag)
 
 def compute_shots(microshot_boundaries, faces_scanner, frames, video):
+    print('Number of microshots: ', len(microshot_boundaries))
     faces_per_frame = IntervalList([
         (frame, frame, facelist)
         for frame, facelist in zip(frames, faces_scanner)
@@ -184,6 +185,7 @@ def compute_shots(microshot_boundaries, faces_scanner, frames, video):
         ])
     bad_transitions = transitions_with_faces.filter(
         payload_satisfies(face_list_stays_the_same))
+    print(bad_transitions.size())
 
     # Finally, compute shot boundaries
     def convert_shot_boundaries_to_shots(shot_boundary_list):
@@ -244,8 +246,8 @@ def save_shots_to_database(shots, video, labeler, tag):
         VideoTag(video=video, tag=tag).save()
 
 # Labeler for HSV histogram shot detection
-LABELER_HIST, _ = Labeler.objects.get_or_create(name='shot-hsvhist-face')
-LABELED_HIST_TAG, _ = Tag.objects.get_or_create(name='shot-hsvhist-face:labeled')
+LABELER_HIST, _ = Labeler.objects.get_or_create(name='shot-hsvhist-face3')
+LABELED_HIST_TAG, _ = Tag.objects.get_or_create(name='shot-hsvhist-face3:labeled')
 
 # Labeler for Face detection
 LABELER_FACE, _ = Labeler.objects.get_or_create(name='mtcnn')
@@ -259,13 +261,17 @@ labeled_videos = set([videotag.video_id
 all_videos = set([video.id for video in Video.objects.all()])
 video_ids = sorted(list(all_videos.difference(labeled_videos).difference(ids_to_exclude)))
 #video_ids=sorted(list(all_videos.difference(ids_to_exclude)))
+video_ids=sorted([
+    video.id for video in Video.objects.filter(small_dataset=True).all()        
+])
+video_ids = [123, 186, 188, 377]
 
 print(video_ids, len(labeled_videos), len(video_ids))
 
 videos = Video.objects.filter(id__in=video_ids).order_by('id').all()
 
 # Cluster parameters
-cfg = cluster_config(num_workers=80, worker=worker_config('n1-standard-32'))
+cfg = cluster_config(num_workers=10, worker=worker_config('n1-standard-32'))
 with make_cluster(cfg, no_delete=True) as db_wrapper:
     db = db_wrapper.db
 #if True:
@@ -288,11 +294,15 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
     print("Computing microshot boundaries")
 
     # Compute microshot boundaries
-    microshot_boundaries = st.shot_detection.compute_shot_boundaries(
-        db,
-        videos=[video.for_scannertools() for video in list(videos)],
-        histograms=hsv_histograms
-    )
+    #microshot_boundaries = st.shot_detection.compute_shot_boundaries(
+    #    db,
+    #    videos=[video.for_scannertools() for video in list(videos)],
+    #    histograms=hsv_histograms
+    #)
+    microshot_boundaries = [
+        microshot_boundaries_from_histograms(hist.load())
+        for hist in tqdm(hsv_histograms, total=len(videos))
+    ]
 
     bad_boundaries = []
     for idx, boundaries in enumerate(microshot_boundaries):
@@ -308,6 +318,14 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
         frames_to_detect_faces(list(boundaries), video)
         for boundaries, video in zip(microshot_boundaries, videos)
     ]
+    #frames = [
+    #    [
+    #        f.number
+    #        for f in Frame.objects.filter(
+    #            video_id=video_id, tags__name='face_computed'
+    #        ).order_by('number').all()
+    #    ] for video_id in video_ids
+    #]
 
     # Compute the faces
     faces = st.face_detection.detect_faces(
@@ -352,4 +370,4 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
             continue
         save_shots_to_database(shots, video, LABELER_HIST, LABELED_HIST_TAG)
 
-Notifier().notify("Done with shot detection!")
+#Notifier().notify("Done with shot detection!")

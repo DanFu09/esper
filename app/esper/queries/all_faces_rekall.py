@@ -11,8 +11,9 @@ def all_faces_rekall():
     from esper.rekall import intrvllists_to_result_bbox
     from esper.stdlib import qs_to_result
         
+    video_name = "inception"
     # Annotate face rows with start and end frames and the video ID
-    faces = Face.objects.annotate(
+    faces = Face.objects.filter(frame__video__name=video_name).annotate(
         min_frame=F('frame__number'),
         max_frame=F('frame__number'),
         video_id=F('frame__video_id'))

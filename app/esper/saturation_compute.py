@@ -19,7 +19,7 @@ labeled_videos = set([videotag.video_id
         for videotag in VideoTag.objects.filter(tag=LABELED_TAG).all()])
 all_videos = set([video.id for video in Video.objects.all()])
 #video_ids = sorted(list(all_videos.difference(labeled_videos).difference(ids_to_exclude)))
-video_ids=sorted(list(all_videos.difference(ids_to_exclude)))
+video_ids=sorted(list(all_videos.difference(ids_to_exclude)))[78:]
 
 print(video_ids, len(labeled_videos), len(video_ids))
 
@@ -62,13 +62,13 @@ if True:
                 
                 frame_obj = Frame.objects.get(video_id=video.id, number=i)
                 frame_obj.saturation = avg_saturation
-                new_frame_tags.append(
-                    Frame.tags.through(frame_id=frame_obj.pk, tag_id=LABELED_TAG.pk))
+                #new_frame_tags.append(
+                #    Frame.tags.through(frame_id=frame_obj.pk, tag_id=LABELED_TAG.pk))
                 frames_to_update.append(frame_obj)
         with transaction.atomic():
             for frame in frames_to_update:
                 frame.save()
-            Frame.tags.through.objects.bulk_create(new_frame_tags)
+            #Frame.tags.through.objects.bulk_create(new_frame_tags)
 
     # Get the videos that already have the tag
     videos_tagged_already = set([

@@ -13,9 +13,10 @@ LABELED_TAG, _ = Tag.objects.get_or_create(name='rgbhists:labeled')
 
 bad_movie_ids = set([])
 
-labeled_videos = set([videotag.video_id
-        for videotag in VideoTag.objects.filter(tag=LABELED_TAG).all()])
-all_videos = set([video.id for video in Video.objects.all()])
+labeled_videos=set()
+#labeled_videos = set([videotag.video_id
+#        for videotag in VideoTag.objects.filter(tag=LABELED_TAG).all()])
+all_videos = set([video.id for video in Video.objects.filter(ignore_film=False).all()])
 video_ids = sorted(list(all_videos.difference(labeled_videos).difference(bad_movie_ids)))
 
 videos = Video.objects.filter(id__in=video_ids).order_by('id')
@@ -30,8 +31,9 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
     histograms = st.histograms.compute_histograms(
         db,
         videos=[video.for_scannertools() for video in list(videos)],
-        run_opts = {'work_packet_size': 25, 'io_packet_size': 1000,
-            'checkpoint_frequency': 1, 'tasks_in_queue_per_pu': 2}
+        run_opts = {'work_packet_size': 8, 'io_packet_size': 2496,
+            'checkpoint_frequency': 1, 'tasks_in_queue_per_pu': 2,
+            'pipeline_instances_per_node': 8}
     )
 
     # Tag this video as being labeled

@@ -103,3 +103,4 @@ def get_from_face_ids(fids):
         LandmarksWrapper(np.array(landmarks_id_bytes[1]), landmarks_id_bytes[0], LABELER)
         for landmarks_id_bytes in result
     ]
+

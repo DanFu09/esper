@@ -188,4 +188,4 @@ def conversations_for_display():
 #             print(intvl.payload)
 #             print(str(intvl.start) + ':' + str(intvl.end))
     
-    return convs
+    return intervallists_to_result_with_objects(convs, lambda a, b: [])

@@ -125,7 +125,7 @@ def get_all_segments(video_ids=None):
     elif not isinstance(video_ids, list):
         video_ids = list(video_ids)
 
-    return zip(video_ids, [_get_all_segments(video_id) for video_id in video_ids])
+    return zip(video_ids, [_get_all_segments(video_id, verbose=True) for video_id in video_ids])
 
 def _get_lowercase_segments(video_id, dilate=1, verbose=False):
     doc_id = VIDEO_ID_TO_DOCUMENT_ID.get(video_id, None)

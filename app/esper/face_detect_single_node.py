@@ -6,23 +6,37 @@ from query.models import Video, Frame, Face, Labeler, Tag, VideoTag, Shot
 from esper.prelude import Notifier
 
 # Load all Star Wars and Harry Potter films
-videos = Video.objects.filter(
-        Q(name__contains="star wars") | Q(name__contains="harry potter")) \
-                .filter(~Q(name="star wars episode i the phantom menace"))
+videos = Video.objects.filter(id=123)
 db = scannerpy.Database()
 
+shots = [
+    Shot.objects.filter(video_id=video.id).all()
+    for video in videos
+]
+
 # Calculate at 2 fps
-frames = [
+frames_2fps = [
     list(range(0, video.num_frames, int(round(video.fps) / 2)))
     for video in videos
 ]
+
+frames = []
+for shot_enumerator, framelist in zip(shots, frames_2fps):
+    shot_boundaries = [
+        (shot.min_frame, shot.max_frame)
+        for shot in shot_enumerator
+    ]
+    starts = set([bounds[0] for bounds in shot_boundaries])
+    ends = set([bounds[1] for bounds in shot_boundaries])
+    framelist = set(framelist).union(starts).union(ends)
+    frames.append(sorted(list(framelist)))
 
 # Detect faces
 faces = st.face_detection.detect_faces(
     db,
     videos=[video.for_scannertools() for video in videos],
     frames=frames,
-    cache=False
+    megabatch=1
 )
 
 # Labeler for this pipeline
@@ -55,14 +69,14 @@ for video, framelist in zip(videos, frames):
 Frame.objects.bulk_create(new_frame_objs)
 
 # Tag all the frames as being labeled
-# new_frame_tags = []
-# for video, framelist in zip(videos, frames):
-#     frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
-#     for frame in frame_objs:
-#         new_frame_tags.append(
-#                 Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
+new_frame_tags = []
+for video, framelist in zip(videos, frames):
+    frame_objs = Frame.objects.filter(video_id=video.id).filter(number__in=framelist)
+    for frame in frame_objs:
+        new_frame_tags.append(
+                Frame.tags.through(frame_id=frame.pk, tag_id=LABELED_TAG.pk))
 
-# Frame.tags.through.objects.bulk_create(new_frame_tags)
+Frame.tags.through.objects.bulk_create(new_frame_tags)
 
 # Tag this video as being labeled
 new_videotags = [VideoTag(video=video, tag=LABELED_TAG) for video in videos]

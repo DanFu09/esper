@@ -18,7 +18,7 @@ ids_to_exclude = set([36, 122, 205, 243, 304, 336, 455, 456, 503])
 
 labeled_videos = set([videotag.video_id
         for videotag in VideoTag.objects.filter(tag=LABELED_TAG).all()])
-all_videos = set([video.id for video in Video.objects.all() if video.id >= 24])
+all_videos = set([video.id for video in Video.objects.all()])
 #video_ids = sorted(list(all_videos.difference(labeled_videos).difference(ids_to_exclude)))
 video_ids=sorted(list(all_videos.difference(ids_to_exclude)))
 
@@ -45,65 +45,65 @@ with make_cluster(cfg, no_delete=True) as db_wrapper:
 #if True:
 #    db = scannerpy.Database() 
 
-    print("Loading faces from Scanner")
-    # Load faces
-    faces = st.face_detection.detect_faces(
-        db,
-        videos=[video.for_scannertools() for video in videos],
-        frames=frames
-    )
+    #print("Loading faces from Scanner")
+    ## Load faces
+    #faces = st.face_detection.detect_faces(
+    #    db,
+    #    videos=[video.for_scannertools() for video in videos],
+    #    frames=frames
+    #)
 
-    print("Detecting face landmarks")
-    # Detect face landmarks
-    face_landmarks = st.face_landmark_detection.detect_face_landmarks(
-        db,
-        videos=[video.for_scannertools() for video in videos],
-        frames=frames,
-        bboxes=faces
-    )
+    #print("Detecting face landmarks")
+    ## Detect face landmarks
+    #face_landmarks = st.face_landmark_detection.detect_face_landmarks(
+    #    db,
+    #    videos=[video.for_scannertools() for video in videos],
+    #    frames=frames,
+    #    bboxes=faces
+    #)
 
-    print("Saving face landmarks to disk")
-    
+    #print("Saving face landmarks to disk")
+    #
     LANDMARKS_DIR = '/app/data/landmarks_tmp/'
-    if not os.path.exists(LANDMARKS_DIR):
-        os.makedirs(LANDMARKS_DIR)
+    #if not os.path.exists(LANDMARKS_DIR):
+    #    os.makedirs(LANDMARKS_DIR)
 
-    for video, framelist, facelist, landmarklist in tqdm(zip(videos, frames, faces, face_landmarks), total=len(videos)):
-        landmarks_and_ids = []
+    #for video, framelist, facelist, landmarklist in tqdm(zip(videos, frames, faces, face_landmarks), total=len(videos)):
+    #    landmarks_and_ids = []
 
-        for frame, faces_in_frame, landmarks_in_frame in zip(framelist, facelist.load(), landmarklist.load()):
-            if len(faces_in_frame) == 0:
-                continue
-            face_objs = list(Face.objects.filter(frame__video_id=video.id).filter(frame__number=frame).all())
-            for bbox, landmarks in zip(faces_in_frame, landmarks_in_frame):
-                face_obj = None
-                for obj in face_objs:
-                    if (abs(obj.bbox_x1 - bbox.x1) < .000001 and
-                        abs(obj.bbox_x2 - bbox.x2) < .000001 and
-                        abs(obj.bbox_y1 - bbox.y1) < .000001 and
-                        abs(obj.bbox_y2 - bbox.y2) < .000001 and
-                        abs(obj.probability - bbox.score) < .000001):
-                        face_obj = obj
-                        break
-                if face_obj is None:
-                    print("Couldn't find face {} in {}".format(bbox, face_objs))
-                landmarks_and_ids.append((face_obj.id, landmarks.tobytes()))
+    #    for frame, faces_in_frame, landmarks_in_frame in zip(framelist, facelist.load(), landmarklist.load()):
+    #        if len(faces_in_frame) == 0:
+    #            continue
+    #        face_objs = list(Face.objects.filter(frame__video_id=video.id).filter(frame__number=frame).all())
+    #        for bbox, landmarks in zip(faces_in_frame, landmarks_in_frame):
+    #            face_obj = None
+    #            for obj in face_objs:
+    #                if (abs(obj.bbox_x1 - bbox.x1) < .000001 and
+    #                    abs(obj.bbox_x2 - bbox.x2) < .000001 and
+    #                    abs(obj.bbox_y1 - bbox.y1) < .000001 and
+    #                    abs(obj.bbox_y2 - bbox.y2) < .000001 and
+    #                    abs(obj.probability - bbox.score) < .000001):
+    #                    face_obj = obj
+    #                    break
+    #            if face_obj is None:
+    #                print("Couldn't find face {} in {}".format(bbox, face_objs))
+    #            landmarks_and_ids.append((face_obj.id, landmarks.tobytes()))
 
-        IDS_FILE = os.path.join(LANDMARKS_DIR, 'landmarks_ids_{}.bin'.format(video.id))
-        LANDMARKS_FILE = os.path.join(LANDMARKS_DIR, 'landmarks_binary_{}.bin'.format(video.id))
-        ENDIAN = 'little'
+    #    IDS_FILE = os.path.join(LANDMARKS_DIR, 'landmarks_ids_{}.bin'.format(video.id))
+    #    LANDMARKS_FILE = os.path.join(LANDMARKS_DIR, 'landmarks_binary_{}.bin'.format(video.id))
+    #    ENDIAN = 'little'
 
-        # 68 x 2 float64's
-        DIMENSIONS = 68 * 2 * 8
+    #    # 68 x 2 float64's
+    #    DIMENSIONS = 68 * 2 * 8
 
-        with open(IDS_FILE, 'wb') as f_ids, open(LANDMARKS_FILE, 'wb') as f_landmarks:
-            for face_id, landmarks in landmarks_and_ids:
-                assert len(landmarks) == DIMENSIONS, 'Incorrect dimensions: {} != {} in video {}'.format(
-                    len(landmarks), DIMENSIONS, video.id)
-                f_ids.write(face_id.to_bytes(8, byteorder=ENDIAN))
-                f_landmarks.write(landmarks)
-        
-    print("Done saving face landmarks to disk!")
+    #    with open(IDS_FILE, 'wb') as f_ids, open(LANDMARKS_FILE, 'wb') as f_landmarks:
+    #        for face_id, landmarks in landmarks_and_ids:
+    #            assert len(landmarks) == DIMENSIONS, 'Incorrect dimensions: {} != {} in video {}'.format(
+    #                len(landmarks), DIMENSIONS, video.id)
+    #            f_ids.write(face_id.to_bytes(8, byteorder=ENDIAN))
+    #            f_landmarks.write(landmarks)
+    #    
+    #print("Done saving face landmarks to disk!")
 
     print("Concatenating landmark files together")
 

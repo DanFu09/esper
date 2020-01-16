@@ -11,6 +11,8 @@ print(shot_scale_enum_to_row)
 video_ids = [videotag.video_id
     for videotag in VideoTag.objects.filter(tag_id=2).order_by('video_id').all()]
 
+video_ids=[344]
+
 print(video_ids)
 
 for video_id in tqdm(video_ids):

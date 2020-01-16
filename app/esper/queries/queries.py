@@ -31,18 +31,21 @@ def query(name):
 
     return wrapper
 
+from .reaction_shots import *
+from .hermione_in_the_center import *
 from .all_faces import *
-from .all_faces_rekall import *
-from .faces_with_gender import *
-from .all_videos import *
 from .all_poses import *
 from .all_face_landmarks import *
-from .all_objects import *
+from .all_videos import *
 from .person_x import *
+from .hero_shot import *
+from .all_faces_rekall import *
+from .faces_with_gender import *
+from .all_objects import *
 from .bright_frames import *
 from .dark_frames import *
 from .cinematic_shots import *
-from .hero_shot import *
+from .manual_shots import *
 from .shot_reverse_shot import *
 from .shot_reverse_shot_advanced import *
 from .shot_reverse_shot_with_context import *

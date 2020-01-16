@@ -69,7 +69,7 @@ services:
       dockerfile: Dockerfile.app
       args:
         cores: {cores}
-    depends_on: [db, frameserver, redis]
+    depends_on: [db, frameserver]
     volumes:
       - ./app:/app
       - ${{HOME}}/.esper/.bash_history:/root/.bash_history
@@ -90,11 +90,6 @@ services:
     privileged: true # make perf work
     security_opt: # make gdb work
       - seccomp=unconfined
-
-  redis:
-    image: redis:4.0.11
-    ports: ['6379:6379']
-    environment: []
 """.format(
         nginx_port=NGINX_PORT,
         ipython_port=IPYTHON_PORT,

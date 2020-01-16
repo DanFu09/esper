@@ -26,9 +26,9 @@ import esper.shot_detection_torch.dataloaders.movies_deepsbd as movies_deepsbd_d
 
 # TRAINING_SET = 'kfolds'
 # TRAINING_SET = '400_min'
-# TRAINING_SET = '4000_min'
+TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
-TRAINING_SET = 'all_movies'
+# TRAINING_SET = 'all_movies'
 # TRAINING_SET = 'ground_truth'
 
 # WEAK_LABELS_PATH = '/app/data/shot_detection_weak_labels/majority_vote_labels_all_windows_downsampled.npy'
@@ -423,7 +423,7 @@ if TRAINING_SET in ['kfolds', 'ground_truth']:
                 num_workers=48,
                 shuffle=False,
                 batch_size=16,
-                pin_memory=True
+                pin_memory=True,
                 sampler=fold_sampler
             )
 
@@ -483,7 +483,7 @@ elif TRAINING_SET in ['400_min', '4000_min', '40000_min', 'all_movies']:
             training_dataloader, 
             deepsbd_resnet_model_no_clipshots, 
             criterion, optimizer, scheduler,
-            log_file = log_file, start_iter = start_iter, save_every=5000
+            log_file = log_file, start_iter = start_iter, save_every=5000 if TRAINING_SET in ['40000_min', 'all_movies'] else 1000
         )
 
 #print('Testing')

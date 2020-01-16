@@ -29,6 +29,7 @@ TRAINING_SET = '4000_min'
 # TRAINING_SET = '40000_min'
 # TRAINING_SET = 'all_movies'
 # TRAINING_SET = 'ground_truth'
+# TRAINING_SET = 'clipshots_pretrained'
 
 # MODEL_SAVE_PATH = '/app/notebooks/learning/models/deepsbd_resnet_train_on_4000_min_majority_vote_downsampled'
 MODEL_SAVE_PATH = sys.argv[1]
@@ -40,9 +41,9 @@ LOCAL_PATH = '/app/data'
 FOLDS_PATH = '/app/data/shot_detection_folds.pkl'
 PER_ITERATION_LOGS = 'average_f1'
 PER_FOLD_LOGS = 'per_fold_perf'
-ITERATION_START = 5000
-ITERATION_END = 800000 + 1
-ITERATION_STRIDE = 5000
+ITERATION_START = 1000
+ITERATION_END = 30000 + 1
+ITERATION_STRIDE = 1000
 SAME_VAL_TEST = True
 VAL_WINDOWS = '/app/data/shot_detection_weak_labels/validation_windows_same_val_test.pkl'
 TEST_WINDOWS = '/app/data/shot_detection_weak_labels/test_windows_same_val_test.pkl'
@@ -298,6 +299,12 @@ else:
                 'fold1_{}_iteration.pth'.format(
                     iteration
                 )))['state_dict']
+            if TRAINING_SET == 'clipshots_pretrained':
+                new_weights = OrderedDict()
+                for k, v in weights.items():
+                    name = k[7:]
+                    new_weights[name] = v
+                weights=new_weights
             deepsbd_resnet_model_no_clipshots.load_state_dict(weights)
             deepsbd_resnet_model_no_clipshots = deepsbd_resnet_model_no_clipshots.eval()
             dataloader = DataLoader(
